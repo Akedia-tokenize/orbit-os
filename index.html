@@ -620,6 +620,9 @@ const ICONS = {
   map: '<path d="M9 3 3 5.5v15L9 18l6 3 6-2.5v-15L15 6Z"/><path d="M9 3v15M15 6v15"/>',
   bag: '<path d="M4.5 8h15l-1 12.5h-13Z"/><path d="M8.5 8V6a3.5 3.5 0 0 1 7 0v2"/>',
   cloud: '<path d="M7 19.5a4.5 4.5 0 0 1-.4-9A6.5 6.5 0 0 1 19 10.8a4.4 4.4 0 0 1-.8 8.7Z"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5.2-5.2 2 2-5.2Z"/>',
+  cap: '<path d="M2.5 8.5 12 4l9.5 4.5L12 13Z"/><path d="M6.5 10.6V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-5.4"/><path d="M21 8.8V14"/>',
+  heart: '<path d="M12 20.5S3.5 15.4 3.5 9.6A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8.5 2.6c0 5.8-8.5 10.9-8.5 10.9Z"/>',
   link: '<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.3 1.3"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.3-1.3"/>',
   google: '<path d="M20.6 12.2c0-.6-.05-1.2-.15-1.7H12v3.4h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6Z"/><path d="M12 21c2.4 0 4.5-.8 6-2.2l-2.9-2.2a5.4 5.4 0 0 1-8-2.8H4.1v2.3A9 9 0 0 0 12 21Z"/><path d="M7.1 13.8a5.4 5.4 0 0 1 0-3.4V8.1H4.1a9 9 0 0 0 0 8.1Z"/><path d="M12 6.6c1.3 0 2.5.45 3.4 1.35l2.6-2.6A9 9 0 0 0 4.1 8.1l3 2.3A5.4 5.4 0 0 1 12 6.6Z"/>',
 };
@@ -650,14 +653,16 @@ const DEFAULTS = () => ({
   },
   events: [], tasks: [], projects: [], notes: [], journal: [], habits: [],
   sessions: [], txns: [], budgets: {}, trips: [],
-  gTrash: [], gcals: [], catPalette: {}, driveId: '', savedAt: ''
+  gTrash: [], gcals: [], cats: [], catPalette: {}, driveId: '', savedAt: '',
+  courses: [], wishlist: [],
+  vision: { motto: '', statement: '', birthday: '', traits: [], pillars: [] }
 });
 
 let DB = DEFAULTS();
 
 function loadDB() {
   const raw = Vault.load();
-  if (!raw) { seed(); return; }
+  if (!raw) { DB = DEFAULTS(); save(); return; }   // a new Orbit starts empty
   try {
     const p = JSON.parse(raw);
     DB = Object.assign(DEFAULTS(), p);
@@ -920,7 +925,7 @@ function formModal(title, fields, init = {}, opts = {}) {
       e.preventDefault();
       const out = {};
       fields.flatMap(f => f.type === 'row' ? f.fields : [f]).forEach(f => {
-        const el = form.elements[f.k]; if (!el) return;
+        const el = form.querySelector(`[name="${f.k}"]`); if (!el) return;
         out[f.k] = f.type === 'number' ? (el.value === '' ? null : Number(el.value)) : el.value;
       });
       closeModal(); resolve(out);
@@ -989,11 +994,15 @@ function parseCSV(text) {
    STARTER CONTENT — so the OS opens with something in it.
    Wipe it any time from Settings → Reset.
    ============================================================ */
+/* Only ever runs if you ask for it from Settings → "Load sample data". */
 function seed() {
   const T = today();
   const d = n => addDays(T, n);
+  const keep = JSON.parse(JSON.stringify(DB.settings || {}));
+  const gcals = DB.gcals || [], driveId = DB.driveId || '';
   DB = DEFAULTS();
-  DB.settings.user = '';
+  DB.settings = Object.assign(DB.settings, keep);
+  DB.gcals = gcals; DB.driveId = driveId;
 
   DB.projects = [
     { id: 'p1', name: 'Personal', color: 'var(--s1)' },
@@ -1110,6 +1119,119 @@ function seed() {
     for (let j = 0; j < c; j++) DB.sessions.push({ id: uid(), date: d(-k), minutes: 25, label: '' });
   }
   save();
+}
+
+/* Wipe everything you have written, keep who you are: theme, currency,
+   Google connection and the calendar list all survive. */
+function clearContent() {
+  const keep = JSON.parse(JSON.stringify(DB.settings || {}));
+  const gcals = DB.gcals || [], driveId = DB.driveId || '';
+  DB = DEFAULTS();
+  DB.settings = Object.assign(DB.settings, keep, { welcomed: true });
+  DB.gcals = gcals; DB.driveId = driveId;
+  save(); refresh();
+}
+</script>
+<script>
+/* ============================================================
+   THE SAMPLE-DATA SWEEPER
+
+   Earlier versions of Orbit filled themselves with invented content on
+   first run. That was a mistake. This finds those exact records — by
+   their exact titles, so nothing of yours is ever caught by accident —
+   and offers to take them out, leaving anything you wrote untouched.
+   ============================================================ */
+const SAMPLE = {
+  events: ['Morning workout', 'Team standup', 'Dentist', 'Dinner with friends', 'Quarterly review', 'Grocery run', 'Flight to Lisbon', 'Pay rent'],
+  tasks: ['Renew passport', 'Draft Q3 summary', 'Reply to landlord', 'Book Lisbon airport transfer', 'Finish chapter 4 exercises', 'Order new desk lamp', 'Back up laptop', 'Send invoice'],
+  notes: ['Lisbon trip ideas', 'Things that made this week better', 'Reading list'],
+  habits: ['Read 20 min', 'Exercise', 'No phone before bed', 'Water 2L'],
+  projects: ['Personal', 'Work', 'Home', 'Learning'],
+  trips: ['Lisbon'],
+  journal: ['Slow start, good finish.', 'Too many small interruptions.'],
+  reasons: ['Lunch out', 'Coffee and a sandwich', 'Groceries for the week', 'Metro top-up',
+    'Taxi home, too late for the bus', 'Monthly subscription', 'Design tool renewal', 'Course instalment',
+    'Book I had been putting off', 'Home internet', 'Electricity', 'Water', 'Gym membership',
+    'Skin appointment', 'A shirt I did not need', 'Shoes, finally', 'Birthday present',
+    'Monthly transfer', 'Monthly pay', 'Side project invoice'],
+  /* the even older seed, before Money was rebuilt around your form */
+  oldCats: ['Groceries', 'Rent', 'Transport', 'Dining', 'Utilities', 'Shopping', 'Health', 'Subscriptions', 'Salary'],
+  budgets: { Groceries: 450, Dining: 200, Transport: 150, Shopping: 250, Subscriptions: 60,
+    'Food & Drink': 320, 'Transportation': 150, 'Clothes': 200, 'Digital Tools': 90, 'Knowledge & Improving myself': 250 },
+};
+
+/* An entry you typed yourself always carries a reason or a payment source —
+   the form makes both unavoidable. The old invented ones carry neither. */
+const isSampleTxn = t =>
+  SAMPLE.reasons.includes(t.reason) ||
+  (!t.source && !t.reason && !t.note && SAMPLE.oldCats.includes(t.category));
+
+function sampleFound() {
+  const f = {
+    events: DB.events.filter(x => !x.gid && SAMPLE.events.includes(x.title)).length,
+    tasks: DB.tasks.filter(x => SAMPLE.tasks.includes(x.title)).length,
+    notes: DB.notes.filter(x => SAMPLE.notes.includes(x.title)).length,
+    journal: DB.journal.filter(x => SAMPLE.journal.some(b => (x.body || '').startsWith(b))).length,
+    habits: DB.habits.filter(x => SAMPLE.habits.includes(x.name)).length,
+    trips: DB.trips.filter(x => SAMPLE.trips.includes(x.name) && /Portugal/i.test(x.dest || '')).length,
+    txns: DB.txns.filter(isSampleTxn).length,
+    sessions: DB.sessions.filter(x => !x.label && x.minutes === 25).length,
+  };
+  f.total = f.events + f.tasks + f.notes + f.journal + f.habits + f.trips + f.txns;
+  return f;
+}
+
+function removeSample() {
+  const f = sampleFound();
+  DB.events = DB.events.filter(x => x.gid || !SAMPLE.events.includes(x.title));
+  DB.tasks = DB.tasks.filter(x => !SAMPLE.tasks.includes(x.title));
+  DB.notes = DB.notes.filter(x => !SAMPLE.notes.includes(x.title));
+  DB.journal = DB.journal.filter(x => !SAMPLE.journal.some(b => (x.body || '').startsWith(b)));
+  DB.habits = DB.habits.filter(x => !SAMPLE.habits.includes(x.name));
+  DB.trips = DB.trips.filter(x => !(SAMPLE.trips.includes(x.name) && /Portugal/i.test(x.dest || '')));
+  DB.txns = DB.txns.filter(x => !isSampleTxn(x));
+  DB.sessions = DB.sessions.filter(x => x.label || x.minutes !== 25);
+  Object.entries(SAMPLE.budgets).forEach(([k, v]) => { if (DB.budgets[k] === v) delete DB.budgets[k]; });
+  /* projects only go if nothing of yours is still filed under them */
+  DB.projects = DB.projects.filter(p =>
+    !SAMPLE.projects.includes(p.name) || DB.tasks.some(t => t.projectId === p.id));
+  DB.catPalette = {};
+  DB.settings.sampleDismissed = true;
+  save(); refresh();
+  return f;
+}
+
+/* the banner you cannot miss, shown at the top of Home */
+function sampleBanner() {
+  if (DB.settings.sampleDismissed) return null;
+  const f = sampleFound();
+  if (!f.total) return null;
+
+  const bits = [];
+  if (f.txns) bits.push(`${f.txns} made-up transactions`);
+  if (f.tasks) bits.push(`${f.tasks} tasks`);
+  if (f.events) bits.push(`${f.events} events`);
+  if (f.notes) bits.push(`${f.notes} notes`);
+  if (f.habits) bits.push(`${f.habits} habits`);
+  if (f.trips) bits.push(`a trip to Lisbon`);
+
+  const card = h('div', { class: 'card', style: { marginBottom: '14px', borderColor: 'var(--crit)' } });
+  card.innerHTML = `<div style="display:flex;align-items:flex-start;gap:12px">
+    <span style="color:var(--crit);flex:0 0 auto;margin-top:2px">${icon('bolt', 20)}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:14px;color:var(--crit)">There is still invented data in here</div>
+      <div class="tiny" style="margin-top:3px">An earlier version of Orbit filled itself in on first run: ${esc(bits.join(', '))}. None of it is yours. Anything you have written or synced from Google stays exactly where it is.</div>
+    </div></div>`;
+  const acts = h('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } },
+    h('button', { class: 'btn primary', html: `${icon('trash', 14)} Remove all of it`, onclick: async () => {
+      const r = removeSample();
+      toast(`Removed ${r.total} made-up entries`, 'trash');
+      if (DB.settings.googleOn) googleSync({ silent: true });
+    } }),
+    h('div', { class: 'spacer' }),
+    h('button', { class: 'btn ghost sm', text: 'Leave it, I will decide later', onclick: () => { DB.settings.sampleDismissed = true; commit(); } }));
+  card.append(acts);
+  return card;
 }
 </script>
 <script>
@@ -1956,6 +2078,15 @@ const EXPENSE_CATS = [
   'Bill',
 ];
 
+/* Your form's ten are only the starting point — add, rename or remove
+   as many as you like from the Categories button in Budgets. */
+function expenseCats() {
+  if (!DB.cats || !DB.cats.length) DB.cats = EXPENSE_CATS.slice();
+  const used = [...new Set(DB.txns.filter(t => t.type !== 'income').map(t => t.category))].filter(Boolean);
+  return [...new Set([...DB.cats, ...used])];
+}
+const NEW_CAT = '__new_category__';
+
 const PAY_SOURCES = [
   { v: 'my monthly budget', short: 'Monthly budget', ok: true },
   { v: 'my employer (through my professional network)', short: 'Employer / network', ok: true },
@@ -2012,26 +2143,36 @@ const isIncome = t => t.type === 'income';
 /* ---------- entry forms ---------- */
 async function editExpense(t) {
   const isNew = !t.id;
-  const cats = [...new Set([...EXPENSE_CATS, ...DB.txns.filter(x => !isIncome(x)).map(x => x.category)])].filter(Boolean);
+  const cats = expenseCats();
   const out = await formModal(isNew ? 'Log an expense' : 'Edit expense', [
     { k: 'date', label: 'Date of expense', type: 'date', required: true },
     { k: 'source', label: 'How did you pay for it?', type: 'select', options: PAY_SOURCES.map(p => [p.v, p.v]) },
     { type: 'row', fields: [
       { k: 'amount', label: 'Amount spent', type: 'number', step: '0.01', required: true },
-      { k: 'category', label: 'Category of expense', type: 'select', options: cats.map(c => [c, c]) }] },
+      { k: 'category', label: 'Category of expense', type: 'select', options: [...cats.map(c => [c, c]), [NEW_CAT, '+ New category…']] }] },
     { k: 'reason', label: 'Reason for expense', type: 'textarea', rows: 3, placeholder: 'What was it for?' },
     { k: 'essential', label: 'How essential was this purchase?', type: 'select',
       options: [['', '— not rated —'], ...[1, 2, 3, 4, 5].map(n => [n, `${n} · ${ESSENTIAL[n]}`])] },
-  ], { date: today(), source: PAY_SOURCES[0].v, category: EXPENSE_CATS[5], essential: '', ...t }, {
+  ], { date: today(), source: PAY_SOURCES[0].v, category: cats[0], essential: '', ...t }, {
     onDelete: isNew ? null : async () => { DB.txns = DB.txns.filter(x => x.id !== t.id); commit(); toast('Deleted', 'trash'); }
   });
   if (!out) return;
+
+  if (out.category === NEW_CAT) {
+    const c = await formModal('New category', [{ k: 'name', label: 'Category name', required: true, placeholder: 'e.g. Rent' }], {}, { ok: 'Add' });
+    if (!c || !c.name.trim()) return;
+    out.category = c.name.trim();
+    if (!DB.cats.includes(out.category)) DB.cats.push(out.category);
+  }
+
   out.type = 'expense';
   out.amount = Math.abs(Number(out.amount) || 0);
   out.essential = out.essential === '' ? null : Number(out.essential);
   if (isNew) DB.txns.push({ id: uid(), ...out });
   else Object.assign(DB.txns.find(x => x.id === t.id), out);
+  Money.jumpTo = monthKey(out.date);          // show me what I just saved
   commit();
+  toast(`${isNew ? 'Logged' : 'Updated'} ${money(out.amount)} · ${out.category}`, 'check');
 }
 
 async function editIncome(t) {
@@ -2052,7 +2193,9 @@ async function editIncome(t) {
   out.amount = Math.abs(Number(out.amount) || 0);
   if (isNew) DB.txns.push({ id: uid(), ...out });
   else Object.assign(DB.txns.find(x => x.id === t.id), out);
+  Money.jumpTo = monthKey(out.date);
   commit();
+  toast(`${isNew ? 'Logged' : 'Updated'} income ${money(out.amount)}`, 'check');
 }
 
 /* ---------- CSV, including your own Google Form responses ---------- */
@@ -2112,10 +2255,13 @@ function barRow(name, amount, max, color, tipExtra) {
   return row;
 }
 
+const Money = { jumpTo: null };
+
 const AppFinance = {
   id: 'finance', name: 'Money', icon: 'wallet', color: '#3f7f5f', w: 1000, h: 700,
   render(root, re, st) {
     st.month = st.month || monthKey(today());
+    if (Money.jumpTo) { st.month = Money.jumpTo; Money.jumpTo = null; }
     st.tab = st.tab || 'overview';
     const app = h('div', { class: 'app' });
 
@@ -2128,7 +2274,7 @@ const AppFinance = {
       h('h2', { text: monthLabel(st.month) }),
       h('div', { class: 'spacer' }));
     const seg = h('div', { class: 'seg' });
-    [['overview', 'Overview'], ['income', 'Income'], ['budgets', 'Budgets'], ['txns', 'All entries']].forEach(([k, l]) =>
+    [['overview', 'Overview'], ['income', 'Income'], ['wish', 'Wishlist'], ['budgets', 'Budgets'], ['txns', 'All entries']].forEach(([k, l]) =>
       seg.append(h('button', { class: st.tab === k ? 'on' : '', text: l, onclick: () => { st.tab = k; re(); } })));
     head.append(seg,
       h('button', { class: 'btn sm', html: `${icon('download', 14)} CSV`, title: 'Import a CSV — including your Google Form responses sheet', onclick: importCSV }),
@@ -2145,6 +2291,7 @@ const AppFinance = {
 
     if (st.tab === 'overview') overviewTab(body, st, re, { mt, exp, inc, spent, earned });
     if (st.tab === 'income') incomeTab(body, st, re, { inc, earned, spent });
+    if (st.tab === 'wish') wishlistTab(body, st, re);
     if (st.tab === 'budgets') budgetsTab(body, st, re, { exp });
     if (st.tab === 'txns') entriesTab(body, st, re, { mt });
 
@@ -2319,6 +2466,122 @@ function incomeTab(body, st, re, d) {
   body.append(c2);
 }
 
+/* ---------- WISHLIST ----------
+   Things you want but have not bought. The number that matters here is
+   how long it has been sitting on the list: wanting something for six
+   weeks is a different fact from wanting it for six minutes. */
+const WANT = { 1: 'Passing thought', 2: 'Would be nice', 3: 'Keep thinking about it', 4: 'Really want it', 5: 'Been wanting it for ages' };
+
+async function editWish(w) {
+  const isNew = !w.id;
+  const out = await formModal(isNew ? 'Something you want' : 'Edit', [
+    { k: 'title', label: 'What is it?', required: true, placeholder: 'Be specific — the exact thing' },
+    { type: 'row', fields: [
+      { k: 'price', label: 'Roughly what it costs', type: 'number', step: '0.01' },
+      { k: 'want', label: 'How much do you want it?', type: 'select', options: [1, 2, 3, 4, 5].map(n => [n, `${n} · ${WANT[n]}`]) }] },
+    { k: 'why', label: 'Why do you want it?', type: 'textarea', rows: 3, required: true,
+      placeholder: 'The honest reason. You will read this back before you buy.' },
+    { type: 'row', fields: [
+      { k: 'decideBy', label: 'Decide by', type: 'date', hint: 'Optional — a date to stop thinking about it.' },
+      { k: 'link', label: 'Link', placeholder: 'Optional' }] },
+  ], { want: 3, ...w }, {
+    onDelete: isNew ? null : async () => { DB.wishlist = DB.wishlist.filter(x => x.id !== w.id); commit(); toast('Removed', 'trash'); }
+  });
+  if (!out) return;
+  out.price = Number(out.price) || 0;
+  out.want = Number(out.want) || 3;
+  if (isNew) { DB.wishlist ||= []; DB.wishlist.push({ id: uid(), added: today(), ...out }); }
+  else Object.assign(DB.wishlist.find(x => x.id === w.id), out);
+  commit();
+}
+
+async function buyWish(w) {
+  const cats = expenseCats();
+  const out = await formModal(`Buying: ${w.title}`, [
+    { type: 'row', fields: [
+      { k: 'date', label: 'Date', type: 'date' },
+      { k: 'amount', label: 'What you actually paid', type: 'number', step: '0.01', required: true }] },
+    { k: 'source', label: 'How did you pay for it?', type: 'select', options: PAY_SOURCES.map(p => [p.v, p.v]) },
+    { k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) },
+    { k: 'essential', label: 'How essential was it, now that you have it?', type: 'select',
+      options: [['', '— not rated —'], ...[1, 2, 3, 4, 5].map(n => [n, `${n} · ${ESSENTIAL[n]}`])] },
+  ], { date: today(), amount: w.price, source: PAY_SOURCES[0].v, category: cats[0], essential: '' },
+     { ok: 'I bought it' });
+  if (!out) return;
+  const waited = daysBetween(w.added, today());
+  DB.txns.push({
+    id: uid(), type: 'expense', date: out.date, amount: Math.abs(Number(out.amount) || 0),
+    category: out.category, source: out.source,
+    reason: `${w.title} — ${w.why}`.slice(0, 400),
+    essential: out.essential === '' ? null : Number(out.essential),
+    waitedDays: waited,
+  });
+  DB.wishlist = DB.wishlist.filter(x => x.id !== w.id);
+  Money.jumpTo = monthKey(out.date);
+  commit();
+  toast(`Bought after ${waited} day${waited === 1 ? '' : 's'} of wanting it`, 'check');
+}
+
+function wishlistTab(body, st, re) {
+  DB.wishlist ||= [];
+  const list = DB.wishlist.slice().sort((a, b) => (b.want || 0) - (a.want || 0) || String(a.added).localeCompare(String(b.added)));
+  const total = list.reduce((a, w) => a + (Number(w.price) || 0), 0);
+  const oldest = list.length ? Math.max(...list.map(w => daysBetween(w.added, today()))) : 0;
+
+  const bar = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' } },
+    h('span', { class: 'tiny', text: list.length ? `${list.length} thing${list.length === 1 ? '' : 's'} · ${money(total)} if you bought them all · oldest has waited ${oldest} day${oldest === 1 ? '' : 's'}` : '' }),
+    h('div', { class: 'spacer' }),
+    h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Add something`, onclick: () => editWish({}) }));
+  body.append(bar);
+
+  if (!list.length) {
+    body.append(h('div', { class: 'empty', style: { minHeight: '220px' }, html:
+      `<div class="big">${icon('heart', 32)}</div><div>Nothing on the list.<br>Put things here instead of in a basket, and see<br>how many of them you still want in a month.</div>` }));
+    return;
+  }
+
+  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))' } });
+  list.forEach(w => {
+    const waited = daysBetween(w.added, today());
+    const due = w.decideBy ? daysBetween(today(), w.decideBy) : null;
+    const card = h('div', { class: 'card', style: { display: 'flex', flexDirection: 'column', gap: '9px' } });
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:9px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:700;line-height:1.3">${esc(w.title)}</div>
+          <div class="tiny" style="margin-top:2px">on the list for ${waited} day${waited === 1 ? '' : 's'}${due != null ? (due >= 0 ? ` · decide within ${due}` : ' · past your decide-by date') : ''}</div>
+        </div>
+        ${w.price ? `<div class="mono" style="font-size:16px;font-weight:600;flex:0 0 auto">${esc(money(w.price))}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <i style="width:8px;height:8px;border-radius:2px;background:${ORD[(w.want || 3) - 1]}"></i>
+        <span class="tiny">${esc(WANT[w.want || 3])}</span>
+      </div>
+      <div class="tiny" style="color:var(--text-2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(w.why || '')}</div>`;
+    const acts = h('div', { style: { display: 'flex', gap: '7px', marginTop: '4px', flexWrap: 'wrap' } },
+      h('button', { class: 'btn primary sm', html: `${icon('check', 13)} I bought it`, onclick: () => buyWish(w) }),
+      h('button', { class: 'btn ghost sm', html: icon('edit', 13), title: 'Edit', onclick: () => editWish(w) }),
+      w.link ? h('a', { class: 'btn ghost sm', href: w.link, target: '_blank', rel: 'noopener', html: icon('link', 13), title: 'Open link' }) : null,
+      h('div', { class: 'spacer' }),
+      h('button', { class: 'btn ghost sm danger', html: `${icon('x', 13)} Let it go`, onclick: async () => {
+        if (await confirmModal('Let it go?', `"${w.title}" comes off the list. No expense is recorded.`, 'Let it go')) {
+          DB.wishlist = DB.wishlist.filter(x => x.id !== w.id); commit(); toast('Off the list', 'x');
+        }
+      } }));
+    card.append(acts);
+    grid.append(card);
+  });
+  body.append(grid);
+
+  const patient = DB.txns.filter(t => t.waitedDays != null);
+  if (patient.length) {
+    const avg = patient.reduce((a, t) => a + t.waitedDays, 0) / patient.length;
+    body.append(h('div', { class: 'card', style: { marginTop: '14px' } },
+      h('h3', { text: 'What waiting has done for you' }),
+      h('div', { class: 'tiny', text: `${patient.length} thing${patient.length === 1 ? '' : 's'} moved from this list into a real purchase, after an average of ${Math.round(avg)} days of wanting.` })));
+  }
+}
+
 /* ---------- BUDGETS ---------- */
 function budgetsTab(body, st, re, d) {
   const { exp } = d;
@@ -2327,8 +2590,9 @@ function budgetsTab(body, st, re, d) {
   const card = h('div', { class: 'card' });
   card.append(h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } },
     h('h3', { text: 'Monthly budgets', style: { margin: 0 } }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: `${icon('grid', 13)} Categories`, onclick: manageCats }),
     h('button', { class: 'btn sm', html: `${icon('plus', 13)} Budget`, onclick: async () => {
-      const cats = [...new Set([...EXPENSE_CATS, ...DB.txns.filter(t => !isIncome(t)).map(t => t.category)])].filter(Boolean);
+      const cats = expenseCats();
       const o = await formModal('Set a budget', [
         { k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) },
         { k: 'amount', label: 'Monthly limit', type: 'number', step: '1', required: true }], {});
@@ -2399,6 +2663,42 @@ function entriesTab(body, st, re, d) {
   if (!list.length) tb.innerHTML = '<tr><td colspan="7" style="padding:34px;text-align:center;color:var(--muted)">Nothing recorded this month.</td></tr>';
   tbl.append(tb); card.append(tbl);
   body.append(card);
+}
+
+/* ---------- category manager ---------- */
+function manageCats() {
+  const body = h('div', {});
+  const list = h('div', { style: { marginBottom: '14px' } });
+  const draw = () => {
+    list.innerHTML = '';
+    expenseCats().forEach(c => {
+      const inUse = DB.txns.some(t => !isIncome(t) && t.category === c);
+      const row = h('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--border)' } });
+      row.append(
+        h('i', { style: { width: '10px', height: '10px', borderRadius: '3px', background: catColor(c), flex: '0 0 auto' } }),
+        h('span', { text: c, style: { flex: '1', fontSize: '13px' } }),
+        inUse ? h('span', { class: 'tiny', text: 'in use' }) : null,
+        h('button', {
+          class: 'btn ghost sm', html: icon('trash', 12), title: inUse ? 'Still used by some entries' : 'Remove',
+          style: { opacity: inUse ? .35 : 1, pointerEvents: inUse ? 'none' : 'auto' },
+          onclick: () => { DB.cats = expenseCats().filter(x => x !== c); save(); draw(); refresh(); }
+        }));
+      list.append(row);
+    });
+  };
+  draw();
+  const inp = h('input', { class: 'inp', placeholder: 'Add a category and press Enter' });
+  inp.onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    const v = inp.value.trim(); if (!v) return;
+    if (!DB.cats) DB.cats = EXPENSE_CATS.slice();
+    if (!DB.cats.includes(v)) DB.cats.push(v);
+    inp.value = ''; save(); draw(); refresh();
+  };
+  body.append(list, inp,
+    h('div', { class: 'tiny', style: { marginTop: '8px' }, text: 'A category that still has entries cannot be removed — change those entries first.' }));
+  modal({ title: 'Spending categories', bodyNode: body,
+    footNode: h('button', { class: 'btn primary', text: 'Done', onclick: closeModal }) });
 }
 
 /* kept so older callers (Spotlight) still work */
@@ -2556,6 +2856,526 @@ const AppTrips = {
 </script>
 <script>
 /* ============================================================
+   AKEDIA AT 25 — the long view
+
+   A motto, the person you are becoming written down, the traits you
+   want to be known for, and the pillars you are actually putting hours
+   into. Progress is logged by hand, on purpose: the point is to notice
+   you did the work, not to have a timer notice for you.
+   ============================================================ */
+
+const PILLAR_COLORS = [1, 3, 7, 2, 5, 4, 6, 8].map(i => `var(--s${i})`);
+
+function vision() {
+  if (!DB.vision) DB.vision = { motto: '', statement: '', birthday: '', traits: [], pillars: [] };
+  const v = DB.vision;
+  v.traits ||= []; v.pillars ||= [];
+  return v;
+}
+
+/* days until the 25th birthday, if a birthday is set */
+function turns25() {
+  const v = vision();
+  if (!v.birthday) return null;
+  const b = fromYmd(v.birthday);
+  const target = new Date(b.getFullYear() + 25, b.getMonth(), b.getDate());
+  const days = daysBetween(today(), ymd(target));
+  const age = (new Date() - b) / (365.2425 * DAY);
+  return { date: ymd(target), days, age };
+}
+
+const pillarLogged = p => (p.log || []).reduce((a, x) => a + (Number(x.amount) || 0), 0);
+const pillarUnit = p => p.goalType === 'hours' ? 'h' : (p.unit || '');
+
+/* how fast you are actually moving, from the last 60 days of entries */
+function pillarPace(p) {
+  const since = addDays(today(), -60);
+  const recent = (p.log || []).filter(x => x.date >= since);
+  if (recent.length < 2 || !p.target) return null;
+  const total = recent.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  const perWeek = total / (60 / 7);
+  if (perWeek <= 0) return null;
+  const left = Math.max(0, p.target - pillarLogged(p));
+  const weeks = left / perWeek;
+  const eta = addDays(today(), Math.round(weeks * 7));
+  return { perWeek, weeks, eta };
+}
+
+async function editVisionMeta() {
+  const v = vision();
+  const out = await formModal('The long view', [
+    { k: 'motto', label: 'Your motto', placeholder: 'The line you want to live by' },
+    { k: 'birthday', label: 'Your date of birth', type: 'date', hint: 'Used only for the countdown to 25.' },
+    { k: 'statement', label: 'Who is Akedia at 25?', type: 'textarea', rows: 6,
+      placeholder: 'Write it in the present tense, as if you already are that person.' },
+  ], { motto: v.motto, birthday: v.birthday, statement: v.statement });
+  if (!out) return;
+  Object.assign(v, out); commit();
+}
+
+async function editPillar(p) {
+  const v = vision();
+  const isNew = !p.id;
+  const out = await formModal(isNew ? 'New pillar' : 'Edit pillar', [
+    { k: 'name', label: 'Pillar', required: true, placeholder: 'e.g. Personal brand, English, Strength' },
+    { k: 'why', label: 'Why this matters', type: 'textarea', rows: 3, placeholder: 'What does the 25-year-old you have because of this?' },
+    { k: 'goalType', label: 'Kind of goal', type: 'select', options: [
+      ['hours', 'Hours of practice — the 10,000-hour kind'],
+      ['number', 'A number to reach — weight, savings, followers…'],
+      ['none', 'No number, just milestones']] },
+    { type: 'row', fields: [
+      { k: 'target', label: 'Target', type: 'number', step: 'any', placeholder: '10000' },
+      { k: 'unit', label: 'Unit', placeholder: 'kg, €, books…', hint: 'Ignored for hour goals.' }] },
+    { k: 'color', label: 'Colour', type: 'select', options: PILLAR_COLORS.map((c, i) => [c, `Colour ${i + 1}`]) },
+  ], { goalType: 'hours', target: 10000, color: PILLAR_COLORS[v.pillars.length % PILLAR_COLORS.length], ...p }, {
+    onDelete: isNew ? null : async () => {
+      if (await confirmModal('Delete pillar?', `"${p.name}", its milestones and every hour you logged against it will be removed.`)) {
+        v.pillars = v.pillars.filter(x => x.id !== p.id); commit();
+      }
+    }
+  });
+  if (!out) return;
+  out.target = out.goalType === 'none' ? 0 : (Number(out.target) || 0);
+  if (isNew) v.pillars.push({ id: uid(), log: [], milestones: [], notes: '', ...out });
+  else Object.assign(v.pillars.find(x => x.id === p.id), out);
+  commit();
+}
+
+async function logPillar(p) {
+  const isHours = p.goalType === 'hours';
+  const out = await formModal(`Log progress · ${p.name}`, [
+    { type: 'row', fields: [
+      { k: 'date', label: 'Date', type: 'date' },
+      { k: 'amount', label: isHours ? 'Hours' : `Amount${p.unit ? ' (' + p.unit + ')' : ''}`, type: 'number', step: 'any', required: true }] },
+    { k: 'note', label: 'What did you actually do?', placeholder: 'Optional, but it is the part you reread later' },
+  ], { date: today() }, { ok: 'Log it' });
+  if (!out) return;
+  (p.log ||= []).push({ id: uid(), date: out.date, amount: Number(out.amount) || 0, note: out.note || '' });
+  commit();
+  toast(`+${out.amount}${isHours ? 'h' : ''} · ${p.name}`, 'check');
+}
+
+const AppVision = {
+  id: 'vision', name: 'Akedia 25', icon: 'compass', color: '#8b5fbf', w: 1000, h: 700,
+  onArg(arg, re) { if (arg && arg.id) this._sel = arg.id; re && re(); },
+  render(root, re, st) {
+    if (this._sel) { st.sel = this._sel; this._sel = null; }
+    const v = vision();
+    const p = v.pillars.find(x => x.id === st.sel);
+    const app = h('div', { class: 'app' });
+
+    const head = h('div', { class: 'app-head' });
+    if (p) head.append(h('button', { class: 'btn ghost sm', html: icon('left', 15), onclick: () => { st.sel = null; re(); }, title: 'Back' }));
+    head.append(h('h2', { text: p ? p.name : (DB.settings.osName === 'Orbit' ? 'Akedia at 25' : 'The long view') }), h('div', { class: 'spacer' }));
+    if (p) head.append(h('button', { class: 'btn sm', html: `${icon('edit', 14)} Edit`, onclick: () => editPillar(p) }),
+      h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Log progress`, onclick: () => logPillar(p) }));
+    else head.append(h('button', { class: 'btn sm', html: `${icon('edit', 14)} Motto & vision`, onclick: editVisionMeta }),
+      h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Pillar`, onclick: () => editPillar({}) }));
+    app.append(head);
+
+    const body = h('div', { class: 'app-body' });
+    p ? pillarDetail(body, p, re, st) : visionOverview(body, v, re, st);
+    app.append(body); root.append(app);
+  }
+};
+
+function visionOverview(body, v, re, st) {
+  const t25 = turns25();
+
+  /* the hero — motto, countdown, who you are becoming */
+  const hero = h('div', { class: 'card', style: {
+    background: 'linear-gradient(135deg, color-mix(in srgb, var(--plum) 26%, transparent), transparent 70%)',
+    borderColor: 'var(--plum)', padding: '20px 22px' } });
+  if (v.motto) hero.append(h('div', { style: { fontSize: '22px', fontWeight: 700, letterSpacing: '-.01em', lineHeight: '1.35' }, text: '“' + v.motto + '”' }));
+  else hero.append(h('div', { style: { fontSize: '18px', color: 'var(--muted)' }, text: 'No motto yet — the line you want to live by goes here.' }));
+
+  if (t25) {
+    const row = h('div', { style: { display: 'flex', gap: '26px', marginTop: '16px', flexWrap: 'wrap', alignItems: 'baseline' } });
+    row.append(
+      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: t25.days > 0 ? t25.days.toLocaleString('en-US') : '0' }),
+        h('div', { class: 'tiny', text: t25.days > 0 ? `days until you turn 25 · ${fmtDate(t25.date, { month: 'long', day: 'numeric', year: 'numeric' })}` : 'you are 25' })),
+      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: t25.age.toFixed(1) }),
+        h('div', { class: 'tiny', text: 'years old today' })),
+      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: Math.max(0, Math.round(t25.days / 7)).toLocaleString('en-US') }),
+        h('div', { class: 'tiny', text: 'weeks left to become him' })));
+    hero.append(row);
+  } else {
+    hero.append(h('button', { class: 'btn sm', style: { marginTop: '14px' }, html: `${icon('calendar', 13)} Add your birthday for the countdown`, onclick: editVisionMeta }));
+  }
+  if (v.statement) hero.append(h('hr', { class: 'hr' }), h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.75', color: 'var(--text-2)' }, text: v.statement }));
+  body.append(hero);
+
+  /* traits — who he is, not what he does */
+  const tc = h('div', { class: 'card', style: { marginTop: '14px' } });
+  tc.append(h('div', { style: { display: 'flex', alignItems: 'center', marginBottom: '10px' } },
+    h('h3', { text: 'The traits he is known for', style: { margin: 0 } }), h('div', { class: 'spacer' })));
+  const chips = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  if (!v.traits.length) chips.append(h('div', { class: 'tiny', text: 'Nothing yet. Add the handful of words you want people to use about you.' }));
+  v.traits.forEach(tr => {
+    const c = h('button', { class: 'chip', style: { padding: '6px 12px', fontSize: '13px' }, title: tr.note || 'Click to remove' });
+    c.innerHTML = `<i class="dot" style="background:var(--plum)"></i>${esc(tr.text)}`;
+    c.onclick = async () => {
+      if (await confirmModal('Remove trait?', `"${tr.text}" will be removed.`, 'Remove')) {
+        v.traits = v.traits.filter(x => x.id !== tr.id); commit();
+      }
+    };
+    chips.append(c);
+  });
+  const ti = h('input', { class: 'inp', placeholder: 'Add a trait and press Enter — patient, relentless, calm under pressure…', style: { marginTop: '12px' } });
+  ti.onkeydown = e => {
+    if (e.key === 'Enter' && ti.value.trim()) { v.traits.push({ id: uid(), text: ti.value.trim() }); ti.value = ''; commit(); }
+  };
+  tc.append(chips, ti);
+  body.append(tc);
+
+  /* the pillars */
+  const hd = h('div', { style: { display: 'flex', alignItems: 'center', margin: '20px 0 10px' } },
+    h('h3', { text: `Pillars${v.pillars.length ? ' · ' + v.pillars.length : ''}`, style: { margin: 0, fontSize: '13px' } }), h('div', { class: 'spacer' }));
+  body.append(hd);
+
+  if (!v.pillars.length) {
+    body.append(h('div', { class: 'empty', style: { minHeight: '180px' }, html:
+      `<div class="big">${icon('compass', 32)}</div><div>No pillars yet.<br>A pillar is one thing you are willing to put a decade into.</div>` }));
+    return;
+  }
+
+  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))' } });
+  v.pillars.forEach(p => {
+    const done = pillarLogged(p);
+    const pct = p.target ? Math.min(100, done / p.target * 100) : 0;
+    const ms = p.milestones || [];
+    const nextMs = ms.filter(m => !m.done).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')))[0];
+    const card = h('div', { class: 'trip-card', onclick: () => { st.sel = p.id; re(); } });
+    card.innerHTML = `
+      <div class="trip-hero" style="height:66px;background:linear-gradient(135deg,${p.color},color-mix(in srgb, ${p.color} 50%, #000))">
+        ${p.goalType !== 'none' && p.target ? `<span class="cd">${pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)}%</span>` : ''}
+        <h4>${esc(p.name)}</h4></div>
+      <div style="padding:12px 14px">
+        ${p.goalType === 'none'
+          ? `<div class="tiny">${ms.filter(m => m.done).length}/${ms.length} milestones reached</div>`
+          : `<div class="mono" style="font-size:15px;font-weight:600">${done.toLocaleString('en-US', { maximumFractionDigits: 1 })}<span class="tiny" style="font-weight:400"> of ${(p.target || 0).toLocaleString('en-US')} ${esc(pillarUnit(p))}</span></div>`}
+        <div class="prog" style="margin-top:8px"><i style="width:${pct}%;background:${p.color}"></i></div>
+        <div class="tiny" style="margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nextMs ? 'Next: ' + esc(nextMs.text) : (p.why ? esc(p.why.split('\\n')[0]) : '&nbsp;')}</div>
+      </div>`;
+    grid.append(card);
+  });
+  body.append(grid);
+}
+
+function pillarDetail(body, p, re, st) {
+  const done = pillarLogged(p);
+  const pct = p.target ? Math.min(100, done / p.target * 100) : 0;
+  const pace = pillarPace(p);
+  const unit = pillarUnit(p);
+
+  const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' } });
+  const stats = [];
+  if (p.goalType !== 'none') {
+    stats.push(['Logged', done.toLocaleString('en-US', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''), `of ${(p.target || 0).toLocaleString('en-US')}`]);
+    stats.push(['Left', Math.max(0, (p.target || 0) - done).toLocaleString('en-US', { maximumFractionDigits: 1 }) + (unit ? ' ' + unit : ''), `${pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)}% done`]);
+  }
+  stats.push(['Milestones', `${(p.milestones || []).filter(m => m.done).length}/${(p.milestones || []).length}`, 'reached']);
+  stats.push(['Pace', pace ? pace.perWeek.toFixed(1) + (unit ? ' ' + unit : '') : '—', pace ? 'per week, last 60 days' : 'log a few entries first']);
+  stats.forEach(([k, v2, d]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(v2)}</div><div class="d">${esc(d)}</div>` })));
+  body.append(tiles);
+
+  if (p.goalType !== 'none' && p.target) {
+    const bar = h('div', { class: 'card', style: { marginTop: '14px' } });
+    bar.innerHTML = `<div class="budget-bar" style="height:12px"><i style="width:${pct}%;background:${p.color}"></i></div>`;
+    if (pace) bar.append(h('div', { class: 'tiny', style: { marginTop: '9px' },
+      text: pace.weeks > 520
+        ? `At this pace it is more than ten years away. Either the target is the wrong size, or the week is.`
+        : `Keep this pace and you get there around ${fmtDate(pace.eta, { month: 'long', year: 'numeric' })} — about ${Math.round(pace.weeks)} weeks.` }));
+    body.append(bar);
+  }
+
+  if (p.why) {
+    const w = h('div', { class: 'card', style: { marginTop: '14px' } });
+    w.append(h('h3', { text: 'Why this matters' }), h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.75', color: 'var(--text-2)' }, text: p.why }));
+    body.append(w);
+  }
+
+  const cols = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(290px,1fr))', marginTop: '14px' } });
+
+  /* milestones */
+  const mc = h('div', { class: 'card' });
+  mc.append(h('h3', { text: 'Milestones' }));
+  (p.milestones || []).slice().sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999'))).forEach(m => {
+    const row = h('div', { class: 'ck' + (m.done ? ' on' : '') });
+    const cb = h('button', { class: 'cbox' + (m.done ? ' on' : ''), style: m.done ? { background: p.color, borderColor: p.color } : {},
+      html: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>`,
+      onclick: () => { m.done = !m.done; m.doneOn = m.done ? today() : null; commit(); } });
+    row.append(cb, h('div', { style: { flex: '1', minWidth: 0 } },
+      h('div', { class: 'cktext', text: m.text, style: { fontSize: '13px' } }),
+      m.date ? h('div', { class: 'tiny', text: m.done ? `reached ${fmtDate(m.doneOn || m.date)}` : `by ${fmtDate(m.date)}` }) : null),
+      h('button', { class: 'btn ghost sm', html: icon('x', 12), onclick: () => { p.milestones = p.milestones.filter(x => x.id !== m.id); commit(); } }));
+    mc.append(row);
+  });
+  const mAdd = h('button', { class: 'btn sm', style: { marginTop: '10px' }, html: `${icon('plus', 13)} Milestone`, onclick: async () => {
+    const o = await formModal('New milestone', [
+      { k: 'text', label: 'What counts as reached?', required: true, placeholder: 'Something you could show someone' },
+      { k: 'date', label: 'By when', type: 'date' }], {}, { ok: 'Add' });
+    if (o) { (p.milestones ||= []).push({ id: uid(), text: o.text, date: o.date, done: false }); commit(); }
+  } });
+  mc.append(mAdd);
+  cols.append(mc);
+
+  /* the log */
+  const lc = h('div', { class: 'card' });
+  lc.append(h('div', { style: { display: 'flex', alignItems: 'center', marginBottom: '10px' } },
+    h('h3', { text: 'What you actually did', style: { margin: 0 } }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: icon('plus', 13), onclick: () => logPillar(p) })));
+  const entries = (p.log || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (!entries.length) lc.append(h('div', { class: 'tiny', text: 'Nothing logged yet.' }));
+  entries.slice(0, 40).forEach(x => {
+    const row = h('div', { style: { display: 'flex', gap: '10px', alignItems: 'baseline', padding: '6px 0', borderBottom: '1px solid var(--border)' } });
+    row.innerHTML = `<span class="tiny mono" style="flex:0 0 62px">${esc(fmtDate(x.date, { month: 'short', day: 'numeric' }))}</span>
+      <span class="mono" style="font-weight:600;flex:0 0 auto">${esc(String(x.amount))}${esc(unit ? ' ' + unit : '')}</span>
+      <span class="tiny" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.note || '')}</span>`;
+    row.append(h('button', { class: 'btn ghost sm', html: icon('x', 11), onclick: () => { p.log = p.log.filter(y => y.id !== x.id); commit(); } }));
+    lc.append(row);
+  });
+  if (entries.length > 40) lc.append(h('div', { class: 'tiny', style: { marginTop: '8px' }, text: `showing the last 40 of ${entries.length}` }));
+  cols.append(lc);
+  body.append(cols);
+
+  /* twelve weeks of effort, so a gap is visible */
+  if (entries.length) {
+    const weeks = [];
+    for (let i = 11; i >= 0; i--) {
+      const end = addDays(today(), -i * 7), start = addDays(end, -6);
+      weeks.push([start, end, (p.log || []).filter(x => x.date >= start && x.date <= end).reduce((a, x) => a + (Number(x.amount) || 0), 0)]);
+    }
+    const maxW = Math.max(1, ...weeks.map(w => w[2]));
+    const c = h('div', { class: 'card', style: { marginTop: '14px' } });
+    c.append(h('h3', { text: 'The last twelve weeks' }));
+    const sp = h('div', { class: 'spark', style: { height: '78px' } });
+    weeks.forEach(([s, e, val]) => {
+      const bar = h('div', { class: 'sb', style: { height: Math.max(3, val / maxW * 70) + 'px', background: p.color, opacity: val ? 1 : .25 } });
+      bindTip(bar, () => `<div class="tk">${fmtDate(s)} – ${fmtDate(e)}</div><div class="tv">${val.toLocaleString('en-US', { maximumFractionDigits: 1 })}${unit ? ' ' + unit : ''}</div>`);
+      sp.append(bar);
+    });
+    c.append(sp);
+    const empties = weeks.filter(w => !w[2]).length;
+    c.append(h('div', { class: 'tiny', style: { marginTop: '8px' },
+      text: empties ? `${empties} of the last 12 weeks had nothing logged.` : 'Twelve weeks without a gap.' }));
+    body.append(c);
+  }
+
+  /* notes */
+  const nc = h('div', { class: 'card', style: { marginTop: '14px' } });
+  nc.append(h('h3', { text: 'Notes' }));
+  const ta = h('textarea', { class: 'inp', rows: 4, placeholder: 'Anything you want to remember about this pillar.' });
+  ta.value = p.notes || '';
+  ta.oninput = () => { p.notes = ta.value; save(); };
+  nc.append(ta);
+  body.append(nc);
+}
+</script>
+<script>
+/* ============================================================
+   COURSES — what you signed up for, why, and what it cost
+
+   The "why" field is the point. Money spent on learning is easy to
+   justify in the moment and hard to account for later; writing the
+   reason down at signup is what makes the answer honest six months on.
+   ============================================================ */
+
+const COURSE_STATES = [
+  { v: 'planned', label: 'Planned', c: 'var(--muted)', ic: 'clock' },
+  { v: 'active', label: 'In progress', c: 'var(--warn)', ic: 'bolt' },
+  { v: 'done', label: 'Finished', c: 'var(--good)', ic: 'check' },
+  { v: 'dropped', label: 'Dropped', c: 'var(--crit)', ic: 'x' },
+];
+const stateOf = v => COURSE_STATES.find(s => s.v === v) || COURSE_STATES[0];
+
+async function editCourse(c) {
+  const isNew = !c.id;
+  const out = await formModal(isNew ? 'New course' : 'Edit course', [
+    { k: 'name', label: 'Course', required: true, placeholder: 'What is it called?' },
+    { k: 'provider', label: 'Where / who from', placeholder: 'Platform, school, teacher' },
+    { type: 'row', fields: [
+      { k: 'start', label: 'Starts', type: 'date' },
+      { k: 'end', label: 'Ends', type: 'date' }] },
+    { k: 'reason', label: 'Why are you enrolling?', type: 'textarea', rows: 3, required: true,
+      placeholder: 'What will you be able to do afterwards that you cannot do now?' },
+    { type: 'row', fields: [
+      { k: 'cost', label: 'Enrolment cost', type: 'number', step: '0.01' },
+      { k: 'status', label: 'Status', type: 'select', options: COURSE_STATES.map(s => [s.v, s.label]) }] },
+    { k: 'link', label: 'Link', placeholder: 'Optional' },
+  ], { start: today(), status: 'planned', ...c }, {
+    onDelete: isNew ? null : async () => {
+      if (await confirmModal('Delete course?', `"${c.name}" will be removed. Any expense you already logged for it stays in Money.`)) {
+        DB.courses = DB.courses.filter(x => x.id !== c.id); commit();
+      }
+    }
+  });
+  if (!out) return;
+  out.cost = Number(out.cost) || 0;
+  if (isNew) { DB.courses ||= []; DB.courses.push({ id: uid(), progress: 0, notes: '', ...out }); }
+  else Object.assign(DB.courses.find(x => x.id === c.id), out);
+  commit();
+  toast(isNew ? 'Course added' : 'Course updated');
+}
+
+/* the fee is a real expense — offer to put it where it belongs */
+async function billCourse(c) {
+  const cats = expenseCats();
+  const cat = cats.find(x => /knowledge/i.test(x)) || cats[0];
+  const out = await formModal('Log the fee as an expense', [
+    { type: 'row', fields: [
+      { k: 'date', label: 'Date paid', type: 'date' },
+      { k: 'amount', label: 'Amount', type: 'number', step: '0.01', required: true }] },
+    { k: 'source', label: 'How did you pay for it?', type: 'select', options: PAY_SOURCES.map(p => [p.v, p.v]) },
+    { k: 'category', label: 'Category', type: 'select', options: cats.map(x => [x, x]) },
+    { k: 'essential', label: 'How essential was this?', type: 'select',
+      options: [['', '— not rated —'], ...[1, 2, 3, 4, 5].map(n => [n, `${n} · ${ESSENTIAL[n]}`])] },
+  ], { date: c.start || today(), amount: c.cost, source: PAY_SOURCES[0].v, category: cat, essential: '4' }, { ok: 'Log it' });
+  if (!out) return;
+  DB.txns.push({
+    id: uid(), type: 'expense', date: out.date, amount: Math.abs(Number(out.amount) || 0),
+    category: out.category, source: out.source,
+    reason: `${c.name}${c.provider ? ' — ' + c.provider : ''}: ${c.reason || 'course fee'}`.slice(0, 400),
+    essential: out.essential === '' ? null : Number(out.essential),
+    courseId: c.id,
+  });
+  c.billed = true;
+  Money.jumpTo = monthKey(out.date);
+  commit();
+  toast(`Logged ${money(out.amount)} to ${out.category}`, 'wallet');
+}
+
+const AppCourses = {
+  id: 'courses', name: 'Courses', icon: 'cap', color: '#b5731c', w: 940, h: 680,
+  onArg(arg, re) { if (arg && arg.id) this._sel = arg.id; re && re(); },
+  render(root, re, st) {
+    DB.courses ||= [];
+    if (this._sel) { st.sel = this._sel; this._sel = null; }
+    st.filter = st.filter || 'all';
+    const c = DB.courses.find(x => x.id === st.sel);
+    const app = h('div', { class: 'app' });
+
+    const head = h('div', { class: 'app-head' });
+    if (c) head.append(h('button', { class: 'btn ghost sm', html: icon('left', 15), onclick: () => { st.sel = null; re(); }, title: 'All courses' }));
+    head.append(h('h2', { text: c ? c.name : 'Courses' }), h('div', { class: 'spacer' }));
+    if (!c) {
+      const seg = h('div', { class: 'seg' });
+      [['all', 'All'], ['active', 'In progress'], ['planned', 'Planned'], ['done', 'Finished']].forEach(([k, l]) =>
+        seg.append(h('button', { class: st.filter === k ? 'on' : '', text: l, onclick: () => { st.filter = k; re(); } })));
+      head.append(seg);
+    }
+    if (c) head.append(h('button', { class: 'btn sm', html: `${icon('edit', 14)} Edit`, onclick: () => editCourse(c) }));
+    head.append(h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Course`, onclick: () => editCourse({}) }));
+    app.append(head);
+
+    const body = h('div', { class: 'app-body' });
+    c ? courseDetail(body, c, re, st) : courseList(body, re, st);
+    app.append(body); root.append(app);
+  }
+};
+
+function courseList(body, re, st) {
+  const all = DB.courses;
+  const spent = all.reduce((a, c) => a + (Number(c.cost) || 0), 0);
+  const doneN = all.filter(c => c.status === 'done').length;
+  const activeN = all.filter(c => c.status === 'active').length;
+  const droppedSpend = all.filter(c => c.status === 'dropped').reduce((a, c) => a + (Number(c.cost) || 0), 0);
+
+  if (all.length) {
+    const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' } });
+    [['Invested', money(spent), `across ${all.length} course${all.length === 1 ? '' : 's'}`, ''],
+     ['In progress', String(activeN), 'right now', ''],
+     ['Finished', `${doneN}/${all.length}`, all.length ? `${Math.round(doneN / all.length * 100)}% completion` : '', ''],
+     ['Dropped', money(droppedSpend), droppedSpend ? 'paid for, not finished' : 'nothing wasted', droppedSpend ? 'var(--crit)' : 'var(--good)'],
+    ].forEach(([k, v, d, c]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d" style="${c ? `color:${c}` : ''}">${esc(d)}</div>` })));
+    body.append(tiles);
+  }
+
+  const list = all.filter(c => st.filter === 'all' || c.status === st.filter)
+    .sort((a, b) => String(b.start || '').localeCompare(String(a.start || '')));
+
+  if (!list.length) {
+    body.append(h('div', { class: 'empty', style: { minHeight: '200px' }, html:
+      `<div class="big">${icon('cap', 32)}</div><div>${all.length ? 'Nothing in this list.' : 'No courses yet.<br>Add one when you sign up — while the reason is still fresh.'}</div>` }));
+    return;
+  }
+
+  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', marginTop: '14px' } });
+  list.forEach(c => {
+    const s = stateOf(c.status);
+    const card = h('div', { class: 'trip-card', onclick: () => { st.sel = c.id; re(); } });
+    const days = c.start ? daysBetween(today(), c.start) : null;
+    card.innerHTML = `
+      <div class="trip-hero" style="height:64px;background:linear-gradient(135deg,var(--s4),color-mix(in srgb, var(--s4) 50%, #000))">
+        ${c.cost ? `<span class="cd">${esc(money(c.cost))}</span>` : ''}
+        <h4 style="font-size:15px">${esc(c.name)}</h4></div>
+      <div style="padding:12px 14px">
+        <div class="tiny">${esc(c.provider || '')}</div>
+        <div style="display:flex;align-items:center;gap:7px;margin:7px 0">
+          <span class="chip" style="color:${s.c};background:transparent;border-color:transparent;padding-left:0">${icon(s.ic, 12, 2.4)}${s.label}</span>
+          <span style="flex:1"></span>
+          <span class="tiny">${c.start ? (days > 0 ? `starts in ${days}d` : esc(fmtDate(c.start))) : ''}</span>
+        </div>
+        <div class="tiny" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(c.reason || '')}</div>
+      </div>`;
+    grid.append(card);
+  });
+  body.append(grid);
+}
+
+function courseDetail(body, c, re, st) {
+  const s = stateOf(c.status);
+  const nights = c.start && c.end ? daysBetween(c.start, c.end) : null;
+  const paid = DB.txns.some(t => t.courseId === c.id);
+
+  const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' } });
+  [['Status', s.label, c.provider || '', s.c],
+   ['Cost', c.cost ? money(c.cost) : '—', paid ? 'logged in Money' : (c.cost ? 'not logged yet' : 'free'), ''],
+   ['Starts', c.start ? fmtDate(c.start) : '—', c.start && daysBetween(today(), c.start) > 0 ? `in ${daysBetween(today(), c.start)} days` : '', ''],
+   ['Length', nights != null ? `${nights}d` : '—', c.end ? `ends ${fmtDate(c.end)}` : 'no end date', ''],
+  ].forEach(([k, v, d, col]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v" style="${col ? `color:${col}` : ''}">${esc(v)}</div><div class="d">${esc(d)}</div>` })));
+  body.append(tiles);
+
+  /* status switcher */
+  const sw = h('div', { class: 'card', style: { marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } });
+  const seg = h('div', { class: 'seg' });
+  COURSE_STATES.forEach(x => seg.append(h('button', { class: c.status === x.v ? 'on' : '', text: x.label, onclick: () => { c.status = x.v; commit(); } })));
+  sw.append(seg, h('div', { class: 'spacer' }));
+  if (c.cost && !paid) sw.append(h('button', { class: 'btn sm', html: `${icon('wallet', 13)} Log the ${money(c.cost)} fee`, onclick: () => billCourse(c) }));
+  if (c.link) sw.append(h('a', { href: c.link, target: '_blank', rel: 'noopener', class: 'btn sm', html: `${icon('link', 13)} Open` }));
+  body.append(sw);
+
+  /* progress */
+  const pc = h('div', { class: 'card', style: { marginTop: '14px' } });
+  pc.append(h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px' } },
+    h('h3', { text: 'Progress', style: { margin: 0 } }), h('div', { class: 'spacer' }),
+    h('span', { class: 'mono', style: { fontSize: '15px', fontWeight: 600 }, text: `${c.progress || 0}%` })));
+  const range = h('input', { type: 'range', min: 0, max: 100, step: 5, style: { width: '100%', accentColor: 'var(--accent-fill)', marginTop: '10px' } });
+  range.value = c.progress || 0;
+  range.oninput = () => { c.progress = Number(range.value); save(); pc.querySelector('.mono').textContent = c.progress + '%'; pc.querySelector('.budget-bar i').style.width = c.progress + '%'; };
+  range.onchange = () => { if (c.progress >= 100 && c.status !== 'done') { c.status = 'done'; toast('Marked as finished', 'check'); } commit(); };
+  pc.append(h('div', { class: 'budget-bar', style: { height: '10px', marginTop: '10px' }, html: `<i style="width:${c.progress || 0}%;background:var(--s4)"></i>` }), range);
+  body.append(pc);
+
+  /* the reason — the whole point of this app */
+  const rc = h('div', { class: 'card', style: { marginTop: '14px', borderColor: 'var(--border-strong)' } });
+  rc.append(h('h3', { text: 'Why you enrolled' }));
+  rc.append(h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.75', color: 'var(--text-2)' },
+    text: c.reason || 'You did not write one down. Add it while you can still remember.' }));
+  if (c.status === 'done') rc.append(h('div', { class: 'tiny', style: { marginTop: '12px' }, text: 'Finished — did it actually deliver that? Worth a line in Notes.' }));
+  body.append(rc);
+
+  const nc = h('div', { class: 'card', style: { marginTop: '14px' } });
+  nc.append(h('h3', { text: 'Notes' }));
+  const ta = h('textarea', { class: 'inp', rows: 5, placeholder: 'What you are learning, what you are stuck on, what you would tell someone considering it.' });
+  ta.value = c.notes || '';
+  ta.oninput = () => { c.notes = ta.value; save(); };
+  nc.append(ta);
+  body.append(nc);
+}
+</script>
+<script>
+/* ============================================================
    HOME — one screen that ties the others together
    ============================================================ */
 function greeting() {
@@ -2579,18 +3399,22 @@ const AppHome = {
 
     const body = h('div', { class: 'app-body' });
 
-    /* first-run: bring your existing stuff in */
-    if (!DB.settings.welcomed) {
+    const warn = sampleBanner();
+    if (warn) body.append(warn);
+
+    /* first run — empty on purpose */
+    if (!DB.settings.welcomed && !warn) {
       const w = h('div', { class: 'card', style: { marginBottom: '14px', borderColor: 'var(--accent)', background: 'var(--accent-soft)' } });
       const row = h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '12px' } });
       row.innerHTML = `<span style="color:var(--accent);flex:0 0 auto;margin-top:2px">${icon('bolt', 20)}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:14px">Bring what you already have</div>
-          <div class="tiny" style="margin-top:3px">Everything below is pre-filled with sample data so you can see how it works — clear it any time from Settings → Reset. To move your real life in: export your Google Calendar as <strong>.ics</strong> and your spending sheet as <strong>.csv</strong>, then import them here.</div>
+          <div style="font-weight:700;font-size:14px">This is yours, and it is empty</div>
+          <div class="tiny" style="margin-top:3px">Nothing here is made up — start typing and it fills with your own life. Connect Google in <strong>Settings</strong> to pull your calendars in, or bring a spending sheet across as <strong>.csv</strong>.</div>
         </div>`;
       const acts = h('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } },
-        h('button', { class: 'btn sm', html: `${icon('calendar', 13)} Import calendar (.ics)`, onclick: importICS }),
-        h('button', { class: 'btn sm', html: `${icon('wallet', 13)} Import spending (.csv)`, onclick: importCSV }),
+        h('button', { class: 'btn sm', html: `${icon('cloud', 13)} Connect Google`, onclick: () => openApp('settings') }),
+        h('button', { class: 'btn sm', html: `${icon('calendar', 13)} Import .ics`, onclick: importICS }),
+        h('button', { class: 'btn sm', html: `${icon('wallet', 13)} Import spending .csv`, onclick: importCSV }),
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn ghost sm', text: 'Got it', onclick: () => { DB.settings.welcomed = true; commit(); } }));
       w.append(row, acts);
@@ -2853,9 +3677,28 @@ const AppSettings = {
           save(); applySettings(); refresh(); toast('Backup restored', 'download');
         } catch (e) { toast('That file is not an Orbit backup', 'x'); }
       } }),
-      h('button', { class: 'btn danger', html: `${icon('trash', 14)} Reset everything`, onclick: async () => {
-        if (await confirmModal('Reset Orbit?', 'Every event, task, note, habit, transaction and trip will be deleted. Export a backup first if you are not sure.', 'Delete it all')) {
-          Vault.wipe(); DB = DEFAULTS(); save(); applySettings(); refresh(); toast('Reset. Fresh start.', 'reset');
+      h('button', { class: 'btn danger', html: `${icon('trash', 14)} Remove sample data only`, title: 'Deletes the invented starter content and nothing else', onclick: async () => {
+        const f = sampleFound();
+        if (!f.total) return toast('No sample data found — you are clean', 'check');
+        if (await confirmModal('Remove the sample data?', `${f.total} invented entries will go. Everything you wrote yourself, and everything synced from Google, stays.`, 'Remove it')) {
+          removeSample(); toast(`Removed ${f.total} entries`, 'trash');
+          if (DB.settings.googleOn) googleSync({ silent: true });
+        }
+      } }),
+      h('button', { class: 'btn', html: `${icon('bolt', 14)} Load sample data`, title: 'Fills Orbit with example content so you can see how it works', onclick: async () => {
+        if (await confirmModal('Load sample data?', 'This replaces everything currently in Orbit with example content. Your theme and Google connection stay as they are.', 'Load it')) {
+          seed(); DB.settings.sampleDismissed = false; applySettings(); refresh(); toast('Sample data loaded', 'bolt');
+        }
+      } }),
+      h('button', { class: 'btn danger', html: `${icon('trash', 14)} Clear all content`, onclick: async () => {
+        if (await confirmModal('Clear everything you have written?',
+          'Every event, task, note, habit, entry and trip goes. Your theme, currency and Google connection stay. Anything that lives in your Google Calendar will come back on the next sync.', 'Clear it')) {
+          clearContent(); toast('Cleared. Blank slate.', 'reset');
+        }
+      } }),
+      h('button', { class: 'btn danger', html: `${icon('x', 14)} Reset Orbit completely`, title: 'Also forgets your Google Client ID and disconnects', onclick: async () => {
+        if (await confirmModal('Reset Orbit completely?', 'This also forgets your Google Client ID and disconnects your account. You would have to set that up again. Export a backup first if you are not sure.', 'Reset everything')) {
+          Vault.wipe(); G.forget(); DB = DEFAULTS(); save(); applySettings(); refresh(); toast('Reset. Fresh start.', 'reset');
         }
       } }));
     const storeNote = h('div', { class: 'tiny', style: { marginTop: '10px' } , text: Vault.persistent
@@ -3285,7 +4128,8 @@ function startGoogleLoop() {
 /* ============================================================
    REGISTRY · SPOTLIGHT · BOOT
    ============================================================ */
-const APPS = [AppHome, AppCalendar, AppTasks, AppNotes, AppHabits, AppFocus, AppFinance, AppTrips,
+const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppNotes, AppHabits, AppFocus,
+  AppFinance, AppCourses, AppTrips,
   Object.assign({ sep: true }, AppSettings)];
 
 /* ---------- spotlight ---------- */
@@ -3319,6 +4163,12 @@ function runSpot(q) {
       push('plane', AppTrips.color, t.name, `Trip · ${fmtDate(t.start)}`, () => openApp('trips', { id: t.id })));
     DB.habits.filter(hb => hb.name.toLowerCase().includes(s)).slice(0, 4).forEach(hb =>
       push('flame', AppHabits.color, hb.name, `Habit · ${streakOf(hb)} day streak`, () => openApp('habits')));
+    (DB.vision?.pillars || []).filter(x => (x.name + ' ' + (x.why || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
+      push('compass', AppVision.color, x.name, 'Pillar · Akedia at 25', () => openApp('vision', { id: x.id })));
+    (DB.courses || []).filter(x => (x.name + ' ' + (x.provider || '') + ' ' + (x.reason || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
+      push('cap', AppCourses.color, x.name, `Course · ${stateOf(x.status).label}`, () => openApp('courses', { id: x.id })));
+    (DB.wishlist || []).filter(x => ((x.title || '') + ' ' + (x.why || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
+      push('heart', AppFinance.color, x.title, `Wishlist · ${daysBetween(x.added, today())} days`, () => { openApp('finance'); const w = WINS.get('finance'); if (w) { w.state.tab = 'wish'; w.rerender(); } }));
 
     push('plus', AppTasks.color, `Add task "${q.trim()}"`, 'Create', () => { const t = quickParse(q.trim()); DB.tasks.push({ id: uid(), done: false, createdAt: today(), ...t }); commit(); toast('Task added'); });
     push('calendar', AppCalendar.color, `Add event "${q.trim()}"`, 'Create for today', () => editEvent({ title: q.trim(), date: today() }));
@@ -3358,7 +4208,7 @@ document.addEventListener('keydown', e => {
   }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
   if (mod && e.key.toLowerCase() === 'w') { const t = topWin(); if (t) { e.preventDefault(); closeApp(t); } return; }
-  if (!typing && !mod && e.key >= '1' && e.key <= '8') { const a = APPS[+e.key - 1]; if (a) openApp(a.id); }
+  if (!typing && !mod && e.key >= '1' && e.key <= '9') { const a = APPS[+e.key - 1]; if (a) openApp(a.id); }
 });
 
 /* ---------- menu bar ---------- */
@@ -3395,6 +4245,12 @@ window.addEventListener('beforeunload', () => { clearTimeout(saveTimer); Vault.s
   openApp('home');
   paintSyncBadge();
   startGoogleLoop();
+  setTimeout(() => {
+    if (!DB.settings.sampleDismissed && sampleFound().total) {
+      toast('Sample data from an older version is still here — see Home', 'bolt');
+      openApp('home');
+    }
+  }, 900);
   if (!Vault.persistent) setTimeout(() => toast('This browser blocks local storage — export a backup before you close the tab', 'bolt'), 1200);
   console.log('%cOrbit', 'font:700 15px Lora,serif;color:#e8567f', '— personal OS ready. Ctrl/⌘+K to search.');
 })();
