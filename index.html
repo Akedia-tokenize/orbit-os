@@ -312,11 +312,11 @@ label.fld > .lb{display:block;font-size:11.5px;font-weight:600;color:var(--muted
 #modal-root .scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(3px)}
 .sheet{
   position:relative;background:var(--surface);border:1px solid var(--border-strong);
-  border-radius:var(--r-win);box-shadow:var(--shadow-win);width:min(520px,100%);
+  border-radius:var(--r-win);box-shadow:var(--shadow-win);width:100%;
   max-height:min(86vh,760px);display:flex;flex-direction:column;overflow:hidden;
   animation:winIn .15s cubic-bezier(.2,.8,.3,1);
 }
-.sheet.wide{width:min(720px,100%)}
+.sheet.wide{width:100%}
 .sheet-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .sheet-h h3{margin:0;font-size:15px;font-weight:700}
 .sheet-b{padding:18px;overflow:auto;flex:1}
@@ -449,7 +449,7 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
   border:1px solid var(--border-strong); box-shadow:var(--shadow-glass);
 }
 .card.glass:hover{box-shadow:var(--shadow-pop)}
-.color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px;padding:4px 0}
+.color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;padding:4px 0}
 .color-opt{
   display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r-sm);
   border:1.5px solid var(--border);background:var(--surface);transition:all .15s;font-size:12px;
@@ -744,7 +744,7 @@ const Vault = (() => {
   };
 })();
 
-const BUILD = '2026-08-18 · 5';
+const BUILD = '2026-08-18 · 7';
 
 const DEFAULTS = () => ({
   version: 1,
@@ -1007,7 +1007,10 @@ function modal({ title, bodyNode, footNode, wide }) {
   head.append(xb);
   sheet.append(head, h('div', { class: 'sheet-b' }, bodyNode));
   if (footNode) sheet.append(h('div', { class: 'sheet-f' }, footNode));
-  $('#modal-slot').innerHTML = ''; $('#modal-slot').append(sheet);
+  const slot = $('#modal-slot');
+  slot.style.width = wide ? 'min(720px,100%)' : 'min(520px,100%)';
+  slot.style.maxHeight = '100%';
+  slot.innerHTML = ''; slot.append(sheet);
   $('#modal-root').classList.add('open');
   modalStack.push({});
   const first = sheet.querySelector('input,textarea,select');
@@ -1015,6 +1018,15 @@ function modal({ title, bodyNode, footNode, wide }) {
   return sheet;
 }
 $('#modal-root').addEventListener('click', e => { if (e.target.dataset.close) closeModal(); });
+
+/* the one shared colour palette — swatch + name everywhere a colour is picked */
+const PALETTE = [
+  ['var(--c1)', 'Coral'], ['var(--c2)', 'Flame'], ['var(--c3)', 'Amber'], ['var(--c4)', 'Sunflower'],
+  ['var(--c5)', 'Leaf'], ['var(--c6)', 'Mint'], ['var(--c7)', 'Teal'], ['var(--c8)', 'Sky'],
+  ['var(--c9)', 'Blue'], ['var(--c10)', 'Iris'], ['var(--c11)', 'Violet'], ['var(--c12)', 'Purple'],
+  ['var(--c13)', 'Orchid'], ['var(--c14)', 'Pink'], ['var(--c15)', 'Blossom'], ['var(--c16)', 'Rose'],
+  ['var(--c17)', 'Ember'], ['var(--c18)', 'Honey'], ['var(--c19)', 'Emerald'], ['var(--c20)', 'Lagoon'],
+];
 
 function field(f, val) {
   const wrap = h('label', { class: 'fld' });
@@ -1027,6 +1039,19 @@ function field(f, val) {
       const [v, l] = Array.isArray(o) ? o : [o, o];
       inp.append(h('option', { value: v, text: l }));
     });
+  } else if (f.type === 'color') {
+    inp = h('input', { type: 'hidden' });
+    const opts = (f.options && f.options.length ? f.options : PALETTE).map(o => Array.isArray(o) ? o : [o, o]);
+    if (val && !opts.some(o => o[0] === val)) opts.unshift([val, 'Current']);
+    const grid = h('div', { class: 'color-grid' });
+    const paint = () => [...grid.children].forEach(b => b.classList.toggle('active', b.dataset.v === inp.value));
+    opts.forEach(([v, l]) => grid.append(h('button', {
+      type: 'button', class: 'color-opt', dataset: { v }, title: l,
+      html: `<i class="swatch" style="background:${v}"></i><span class="cname">${esc(l)}</span>`,
+      onclick: () => { inp.value = v; paint(); } })));
+    if (!val && !f.def && opts.length) inp.value = opts[0][0];
+    wrap.append(grid);
+    f._paint = paint;
   } else {
     inp = h('input', { class: 'inp', type: f.type || 'text', placeholder: f.placeholder || '', step: f.step, min: f.min });
     if (f.suggest && f.suggest.length) {
@@ -1040,8 +1065,9 @@ function field(f, val) {
   inp.name = f.k;
   if (val != null) inp.value = val;
   else if (f.def != null) inp.value = f.def;
-  if (f.required) inp.required = true;
+  if (f.required && f.type !== 'color') inp.required = true;
   wrap.append(inp);
+  if (f._paint) f._paint();
   if (f.hint) wrap.append(h('div', { class: 'tiny', text: f.hint, style: { marginTop: '4px' } }));
   return wrap;
 }
@@ -1798,7 +1824,7 @@ const AppTasks = {
     const addP = h('button', { class: 'navitem', style: { color: 'var(--muted)' }, html: `${icon('plus', 14)}<span>New project</span>`, onclick: async () => {
       const o = await formModal('New project', [
         { k: 'name', label: 'Name', required: true },
-        { k: 'color', label: 'Colour', type: 'select', options: [1, 2, 3, 4, 5, 6, 7, 8].map(i => [`var(--s${i})`, `Colour ${i}`]) }], {});
+        { k: 'color', label: 'Colour', type: 'color' }], {});
       if (o && o.name) { DB.projects.push({ id: uid(), name: o.name, color: o.color }); commit(); }
     } });
     side.append(addP);
@@ -2010,7 +2036,7 @@ const AppHabits = {
     head.append(h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Habit`, onclick: async () => {
       const o = await formModal('New habit', [
         { k: 'name', label: 'Habit', required: true, placeholder: 'e.g. Read 20 min' },
-        { k: 'color', label: 'Colour', type: 'select', options: [1, 3, 7, 4, 5, 2, 8, 6].map(i => [`var(--s${i})`, `Colour ${i}`]) }], {});
+        { k: 'color', label: 'Colour', type: 'color' }], {});
       if (o && o.name) { DB.habits.push({ id: uid(), name: o.name, color: o.color, log: {} }); commit(); }
     } }));
     app.append(head);
@@ -3179,7 +3205,7 @@ async function editTrip(t) {
     { type: 'row', fields: [{ k: 'start', label: 'Leaves', type: 'date' }, { k: 'end', label: 'Returns', type: 'date' }] },
     { type: 'row', fields: [
       { k: 'budget', label: 'Budget', type: 'number', step: '1' },
-      { k: 'color', label: 'Colour', type: 'select', options: TRIP_COLORS.map((c, i) => [c, `Colour ${i + 1}`]) }] },
+      { k: 'color', label: 'Colour', type: 'color' }] },
     { k: 'notes', label: 'Notes', type: 'textarea', rows: 3 },
   ], { start: today(), end: addDays(today(), 5), color: TRIP_COLORS[0], ...t }, {
     onDelete: isNew ? null : async () => {
@@ -3387,7 +3413,7 @@ async function editPillar(p) {
     { type: 'row', fields: [
       { k: 'target', label: 'Target', type: 'number', step: 'any', placeholder: '10000' },
       { k: 'unit', label: 'Unit', placeholder: 'kg, €, books…', hint: 'Ignored for hour goals.' }] },
-    { k: 'color', label: 'Colour', type: 'select', options: PILLAR_COLORS.map((c, i) => [c, `Colour ${i + 1}`]) },
+    { k: 'color', label: 'Colour', type: 'color' },
   ], { goalType: 'hours', target: 10000, color: PILLAR_COLORS[v.pillars.length % PILLAR_COLORS.length], ...p }, {
     onDelete: isNew ? null : async () => {
       if (await confirmModal('Delete pillar?', `"${p.name}", its milestones and every hour you logged against it will be removed.`)) {
