@@ -5521,8 +5521,8 @@ function goalSticker(g){return g.sticker||({'Health':'💪','Learning':'📚','W
 function goalSeason(g){const base=goalDeadline(g)||g.startDate||today(); const a=String(base).split('-').map(Number); const j=gregorianToJalali(a[0],a[1],a[2]); const m=j[1]; if(m<=3)return {key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'}; if(m<=6)return {key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'}; if(m<=9)return {key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'}; return {key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'};}
 function goalCardV5(g){const pct=goalPct(g),d=goalDeadline(g),days=d?daysBetween(today(),d):null;const overdue=days!=null&&days<0&&!g.done;const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});c.onclick=e=>{if(e.target.closest('button'))return;editGoalV5(g)};c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker" title="Goal sticker">${goalSticker(g)}</div><div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}">${esc(g.priority||'Medium')}</span></div><h3>${esc(g.title)}</h3><div class="goal-kpi"><span>${esc(g.pillarId?(vision().pillars.find(p=>p.id===g.pillarId)?.name||'Pillar'):(g.kpi||g.measurement||'Outcome'))}</span><strong>${g.target!=null&&g.target!==''?`${g.current||0} / ${g.target} ${esc(g.unit||'')}`:(g.done?'Complete':'In progress')}</strong></div><div class="goal-bar"><i style="width:${pct}%"></i></div><div class="goal-foot"><span>${d?`${esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'}))}`:'No deadline'} </span><b class="${overdue?'overdue':''}">${overdue?'OVERDUE':days===0?'TODAY':days!=null?`${days}d left`:''}</b></div>${reviewBadges(g)?`<div class="review-row">${reviewBadges(g)}</div>`:''}`;return c;}
 AppGoals.render=function(root,re,st){ensureGoalModel();const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallenge}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV5({},'week')}));app.append(head);const body=h('div',{class:'app-body'});body.append(challengeCard(re));
-  const controls=h('div',{class:'goal-controls'}), scope=h('div',{class:'seg'}), scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
-  const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}];const seasonGroups={};seasons.forEach(x=>seasonGroups[x.key]=[]);list.forEach(g=>seasonGroups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=seasonGroups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});const sh=h('div',{class:'goal-season-head'});sh.append(h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`}));sec.append(sh);const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV5(g)));sec.append(grid);});body.append(sec);});if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app);
+  const controls=h('div',{class:'goal-controls'}), scope=h('div',{class:'seg'}), scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
+  const list=DB.goals.filter(g=>(st.scope||'quarter')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}];const seasonGroups={};seasons.forEach(x=>seasonGroups[x.key]=[]);list.forEach(g=>seasonGroups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=seasonGroups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});const sh=h('div',{class:'goal-season-head'});sh.append(h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`}));sec.append(sh);const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV5(g)));sec.append(grid);});body.append(sec);});if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app);
 };
 /* Pillars: dates + linked goals */
 const editPillarV5=editPillar;
@@ -5656,14 +5656,117 @@ function challengeCardV8(){
 AppFinance.render = (function(old){return function(root,re,st){old(root,re,st); const app=root.querySelector('.app'); if(!app)return; const head=app.querySelector('.app-head'); const seg=head&&head.querySelector('.seg'); if(seg && ![...seg.querySelectorAll('button')].some(b=>b.textContent.includes('Investments'))){const b=h('button',{class:st.tab==='investments'?'on':'',text:'Investments',onclick:()=>{st.tab='investments';re()}});seg.insertBefore(b,seg.lastElementChild);} if(st.tab==='investments'){const body=app.querySelector('.app-body'); if(body){body.innerHTML='';investmentPanelV8(body,st);}}};})(AppFinance.render);
 
 AppGoals.render=function(root,re,st){ensureGoalModel();const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → stages → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallengeV8}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV8({},'week')}));app.append(head);const body=h('div',{class:'app-body'});body.append(challengeCardV8());
- const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
- const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
+ const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
+ const list=DB.goals.filter(g=>(st.scope||'quarter')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
  const goalCard=g=>{const pct=goalStageProgress(g),d=goalDeadline(g),days=d?daysBetween(today(),d):null,c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});c.onclick=e=>{if(!e.target.closest('button'))editGoalV8(g)};c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker">${goalSticker(g)}</div><div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}">${esc(g.priority||'Medium')}</span></div><h3>${esc(g.title)}</h3><div class="goal-kpi"><span>${esc(g.kpi||g.measurement||'Outcome')}</span><strong>${pct}% complete</strong></div><div class="goal-bar"><i style="width:${pct}%"></i></div><div class="goal-foot"><span>${d?esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'})):'No deadline'}</span><b>${days!=null?(days<0?'OVERDUE':days===0?'TODAY':days+'d left'):''}</b></div>${(g.reviewDates||[]).length?`<div class="review-row">${reviewBadges(g)}</div>`:''}<div class="goal-stages">${(g.milestones||[]).map((m,i)=>`<button class="goal-stage ${m.done?'done':''}" onclick="event.stopPropagation();toggleGoalStageV8('${g.id}','${m.id}')"><span>${m.done?'✓':i+1}</span><em>${esc(m.title)}</em></button>`).join('')}</div>`;return c};
- if((st.scope||'all')==='quarter'){const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}],groups={spring:[],summer:[],autumn:[],winter:[]};list.forEach(g=>groups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=groups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goals`})));const grid=h('div',{class:'goal-grid'});gs.forEach(g=>grid.append(goalCard(g)));sec.append(grid);body.append(sec)});} else {const grid=h('div',{class:'goal-grid'});list.forEach(g=>grid.append(goalCard(g)));if(list.length)body.append(grid)}
+ if((st.scope||'all')==='quarter'){const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}],groups={spring:[],summer:[],autumn:[],winter:[]};list.forEach(g=>groups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=groups[se.key];if((st.scope||'quarter')!=='quarter'&&!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goals`})));const grid=h('div',{class:'goal-grid'});gs.forEach(g=>grid.append(goalCard(g)));sec.append(grid);body.append(sec)});} else {const grid=h('div',{class:'goal-grid'});list.forEach(g=>grid.append(goalCard(g)));if(list.length)body.append(grid)}
  if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app)};
 
 /* Gregorian-only goal dates: old Persian helper functions remain for legacy data, but no longer appear in Goal UI. */
 
+
+/* ---------- Goals V6: stable render + seasons + per-goal progress + Growth Review ---------- */
+function goalSeasonV6(g){
+  const base=goalDeadline(g)||g.startDate||today();
+  const parts=String(base).split('-').map(Number);
+  let month=parts[1];
+  try{ if(parts.length===3 && typeof gregorianToJalali==='function'){ month=gregorianToJalali(parts[0],parts[1],parts[2])[1]; } }catch(e){}
+  if(month<=3)return {key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'};
+  if(month<=6)return {key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'};
+  if(month<=9)return {key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'};
+  return {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'};
+}
+function goalProgressV6(g){
+  const ms=Array.isArray(g.milestones)?g.milestones:[];
+  if(ms.length)return Math.round(ms.filter(m=>m.done).length/ms.length*100);
+  return Math.round(Math.max(0,Math.min(100,Number(goalPct(g))||0)));
+}
+function goalCardV6(g){
+  const pct=goalProgressV6(g), d=goalDeadline(g), days=d?daysBetween(today(),d):null;
+  const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});
+  c.onclick=e=>{if(!e.target.closest('button'))editGoalV8(g)};
+  const stages=(g.milestones||[]).map((m,i)=>`<button class="goal-stage ${m.done?'done':''}" onclick="event.stopPropagation();toggleGoalStageV8('${g.id}','${m.id}')"><span>${m.done?'✓':i+1}</span><em>${esc(m.title)}</em></button>`).join('');
+  c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker" title="Goal sticker">${goalSticker(g)}</div>
+    <div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}" >${esc(g.priority||'Medium')}</span></div>
+    <h3>${esc(g.title||'Untitled goal')}</h3>
+    <div class="goal-kpi"><span>${esc(g.kpi||g.measurement||'Outcome')}</span><strong>${pct}% complete</strong></div>
+    <div class="goal-bar"><i style="width:${pct}%"></i></div>
+    <div class="goal-foot"><span>${d?esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'})):'No deadline'}</span><b>${days!=null?(days<0?'OVERDUE':days===0?'TODAY':days+'d left'):''}</b></div>
+    ${(g.startDate||d)?`<div class="challenge-dates"><span class="challenge-date">START · ${g.startDate?esc(fmtDate(g.startDate,{month:'short',day:'numeric',year:'numeric'})):'—'}</span><span class="challenge-date">DEADLINE · ${d?esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'})):'—'}</span></div>`:''}
+    ${(g.reviewDates||[]).length?`<div class="review-row">${reviewBadges(g)}</div>`:''}
+    ${stages?`<div class="goal-stages">${stages}</div>`:''}`;
+  return c;
+}
+function challengeCardV6(){
+  ensureGoalModel();
+  const key=gregorianMonthKey(), c=DB.challenges[key], card=h('div',{class:'challenge-hero'});
+  if(!c){
+    card.innerHTML=`<div class="challenge-orb">${icon('bolt',28,1.7)}</div><div class="challenge-copy"><div class="eyebrow">MONTHLY CHALLENGE · ${esc(monthLabelGregorian(key))}</div><h2>Give this month one deliberate edge.</h2><p>Choose one challenge, define the win, and track the climb.</p></div>`;
+    card.append(h('button',{class:'btn primary',html:`${icon('plus',14)} Set challenge`,onclick:editChallengeV8})); return card;
+  }
+  const cur=Number(c.current)||0,target=Number(c.target)||0,pct=target?Math.max(0,Math.min(100,cur/target*100)):0;
+  card.innerHTML=`<div class="challenge-orb">${icon('bolt',28,1.7)}</div><div class="challenge-copy"><div class="eyebrow">MONTHLY CHALLENGE · ${esc(monthLabelGregorian(key))}</div><h2>${esc(c.title)}</h2><p>${esc(c.why||'Make the month measurable.')}</p><div class="challenge-dates"><span class="challenge-date">START · ${esc(fmtDate(c.startDate,{month:'short',day:'numeric',year:'numeric'}))}</span><span class="challenge-date">END · ${esc(fmtDate(c.endDate,{month:'short',day:'numeric',year:'numeric'}))}</span></div><div class="challenge-meta"><span>${esc(c.metric||'Define success')}</span><strong>${cur}${target?` / ${target} ${esc(c.unit||'')}`:''}</strong></div><div class="challenge-bar"><i style="width:${pct}%"></i></div><div class="challenge-progress-history">${(c.progressLog||[]).slice(-6).reverse().map(x=>`<span>${esc(fmtDate(x.date,{month:'short',day:'numeric'}))} · <b>${esc(String(x.value))}</b>${x.note?` · ${esc(x.note)}`:''}</span>`).join('')}</div></div>`;
+  card.append(h('button',{class:'btn sm',html:`${icon('edit',13)} Edit`,onclick:editChallengeV8}),h('button',{class:'btn primary sm',html:`${icon('plus',13)} Log progress`,onclick:async()=>{const o=await formModal('Log challenge progress',[{k:'current',label:'Current value',type:'number',step:'any'},{k:'note',label:'What changed?',type:'textarea',rows:2}],{current:c.current||0});if(o){c.current=Number(o.current)||0;c.progressLog ||= [];c.progressLog.push({id:uid(),date:today(),value:c.current,note:o.note||''});commit();}}}));
+  return card;
+}
+AppGoals.render=function(root,re,st){
+  try{
+    ensureGoalModel(); st=st||{};
+    const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});
+    head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → stages → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallengeV8}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV8({},'week')}));
+    app.append(head); const body=h('div',{class:'app-body'}); body.append(challengeCardV6());
+    const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];
+    scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));
+    controls.append(scope);
+    const cat=h('select',{class:'inp goal-filter'}); cat.append(h('option',{value:'all',text:'All categories'})); goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x}))); cat.value=st.cat||'all'; cat.onchange=()=>{st.cat=cat.value;re()}; controls.append(cat); body.append(controls);
+    const isQuarter=(st.scope||'quarter')==='quarter';
+    // Quarter is the seasonal overview: every Goal belongs to one of the four
+    // Jalali seasons regardless of its Daily/Weekly/Monthly/etc. scope.
+    const list=DB.goals
+      .filter(g=>isQuarter || (st.scope==='all' || g.scope===st.scope))
+      .filter(g=>(st.cat||'all')==='all'||g.category===st.cat)
+      .sort(goalSort);
+    const seasons=[
+      {key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'},
+      {key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'},
+      {key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'},
+      {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'}
+    ];
+    const groups={spring:[],summer:[],autumn:[],winter:[]};
+    list.forEach(g=>groups[goalSeasonV6(g).key].push(g));
+    if(isQuarter){
+      // Always render all four seasons, even when a season has no Goals yet.
+      seasons.forEach(se=>{
+        const gs=groups[se.key];
+        const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});
+        sec.append(h('div',{class:'goal-season-head'},
+          h('div',{class:'goal-season-icon',text:se.icon}),
+          h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:se.months})),
+          h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`})
+        ));
+        if(!gs.length){
+          sec.append(h('div',{class:'empty season-empty',style:{minHeight:'90px'},html:`<div class="tiny">No goals in ${se.name} yet.</div><button class="btn sm" onclick="document.querySelector('.goal-app .btn.primary')?.click()">+ Add goal</button>`}));
+        } else {
+          const byCat={};
+          gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));
+          Object.entries(byCat).forEach(([catName,cgs])=>{
+            sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));
+            const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV6(g)));sec.append(grid);
+          });
+        }
+        body.append(sec);
+      });
+    } else {
+      const grid=h('div',{class:'goal-grid'});
+      list.forEach(g=>grid.append(goalCardV6(g)));
+      if(list.length)body.append(grid);
+      else body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));
+    }
+    body.append(growthReviewCard()); app.append(body); root.append(app);
+  }catch(err){
+    console.error('Goals render failed',err); root.innerHTML=''; const app=h('div',{class:'app'}),body=h('div',{class:'app-body'});body.append(h('div',{class:'empty',html:`<div class="big">⚠️</div><div><strong>Goals could not be rendered.</strong><br><span class="tiny">Your goal data is safe. Try reopening Goals after this update.</span></div><button class="btn primary" onclick="AppGoals.render(this.closest('.app').parentElement,()=>{},{});">Retry</button></div>`}));app.append(body);root.append(app);
+  }
+};
 </script>
 </body>
 </html>async function editInvest(t) {
