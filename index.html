@@ -456,8 +456,66 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
 .seg button{padding:4px 12px;border-radius:5px;font-size:12.5px;font-weight:600;color:var(--text-2)}
 .seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.2)}
 
+/* ---------- Akedia 25 ---------- */
+.vision-hero{
+  position:relative; overflow:hidden; border-radius:var(--r-md);
+  padding:26px 28px; border:1px solid var(--plum); isolation:isolate;
+}
+.vision-hero::before{
+  content:""; position:absolute; inset:-60%; z-index:-1; opacity:.30;
+  background:conic-gradient(from 0deg, var(--plum), var(--accent), var(--plum), var(--accent), var(--plum));
+  filter:blur(70px); animation:auraSpin 26s linear infinite;
+}
+html[data-theme="light"] .vision-hero::before{opacity:.20}
+@keyframes auraSpin{to{transform:rotate(360deg)}}
+.vision-motto{
+  font-size:clamp(20px,3.1vw,32px); font-weight:700; line-height:1.28;
+  letter-spacing:-.015em; text-wrap:balance;
+}
+.vision-nums{display:flex;gap:30px;flex-wrap:wrap;margin-top:20px}
+.vision-num{font-variant-numeric:tabular-nums;font-size:32px;font-weight:600;line-height:1;letter-spacing:-.02em}
+.vision-num.big{font-size:44px}
+
+/* a life, one square per week */
+.wk-grid{display:grid;grid-template-columns:repeat(52,minmax(0,11px));gap:2.5px;margin-top:8px;justify-content:start}
+.wk{aspect-ratio:1;border-radius:2px;background:var(--surface-3);opacity:.5}
+.wk.lived{background:var(--plum);opacity:1}
+.wk.now{background:var(--accent);box-shadow:0 0 0 1.5px var(--surface),0 0 9px var(--accent);animation:nowPulse 2.6s ease-in-out infinite}
+@keyframes nowPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
+.wk-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+
+/* trait chips that actually glow a little */
+.trait{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 15px;border-radius:99px;
+  font-size:13.5px;font-weight:600;border:1px solid var(--plum);
+  background:color-mix(in srgb, var(--plum) 15%, transparent);
+  transition:transform .14s, box-shadow .18s;
+}
+.trait:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px var(--plum)}
+
+/* circular progress on the pillar cards */
+.ring{position:relative;width:62px;height:62px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg);display:block}
+.ring .pct{
+  position:absolute;inset:0;display:grid;place-items:center;
+  font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.pillar-card{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:16px;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s;
+  display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;
+}
+.pillar-card::after{
+  content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--pc);
+}
+.pillar-card:hover{transform:translateY(-3px);border-color:var(--border-strong);box-shadow:var(--shadow-pop)}
+
 /* ---------- responsive / mobile ---------- */
 @media (max-width:820px){
+  .wk-grid{grid-template-columns:repeat(52,minmax(0,1fr));gap:1.5px}
+  .vision-nums{gap:20px}
+  .vision-num{font-size:26px}
+  .vision-num.big{font-size:34px}
   #dicons{display:none}
   .side{flex-basis:150px}
   .side.wide{flex-basis:170px}
@@ -653,7 +711,7 @@ const DEFAULTS = () => ({
   },
   events: [], tasks: [], projects: [], notes: [], journal: [], habits: [],
   sessions: [], txns: [], budgets: {}, trips: [],
-  gTrash: [], gcals: [], cats: [], catPalette: {}, driveId: '', savedAt: '',
+  gTrash: [], gcals: [], cats: [], incomeCats: [], catPalette: {}, driveId: '', savedAt: '',
   courses: [], wishlist: [],
   vision: { motto: '', statement: '', birthday: '', traits: [], pillars: [] }
 });
@@ -2097,6 +2155,12 @@ const PAY_SOURCES = [
 const payOf = v => PAY_SOURCES.find(p => p.v === v) || { v, short: v || '—', ok: true };
 
 const INCOME_SOURCES = ['Salary', 'Freelance / client work', 'Business', 'Investment return', 'Gift', 'Refund', 'Other'];
+function incomeCats() {
+  if (!DB.incomeCats || !DB.incomeCats.length) DB.incomeCats = INCOME_SOURCES.slice();
+  const used = [...new Set(DB.txns.filter(isIncome).map(t => t.category || t.source))].filter(Boolean);
+  return [...new Set([...DB.incomeCats, ...used])];
+}
+const incomeCatOf = t => t.category || t.source || 'Other';
 
 const ESSENTIAL = { 1: 'Optional / luxury', 2: 'Mostly optional', 3: 'Neutral', 4: 'Fairly necessary', 5: 'Necessary / essential' };
 const ORD = ['var(--ord1)', 'var(--ord2)', 'var(--ord3)', 'var(--ord4)', 'var(--ord5)'];
@@ -2177,19 +2241,27 @@ async function editExpense(t) {
 
 async function editIncome(t) {
   const isNew = !t.id;
-  const seen = [...new Set([...INCOME_SOURCES, ...DB.txns.filter(isIncome).map(x => x.source)])].filter(Boolean);
+  const cats = incomeCats();
   const out = await formModal(isNew ? 'Log income' : 'Edit income', [
     { k: 'date', label: 'Date received', type: 'date', required: true },
     { type: 'row', fields: [
       { k: 'amount', label: 'Amount', type: 'number', step: '0.01', required: true },
-      { k: 'source', label: 'Where did it come from?', suggest: seen, placeholder: 'Salary, client, gift…' }] },
+      { k: 'category', label: 'Category', type: 'select', options: [...cats.map(c => [c, c]), [NEW_CAT, '+ New category…']] }] },
     { k: 'reason', label: 'Note', type: 'textarea', rows: 3, placeholder: 'Optional' },
-  ], { date: today(), source: INCOME_SOURCES[0], ...t }, {
+  ], { date: today(), category: incomeCatOf(t) || cats[0], ...t, category: t.id ? incomeCatOf(t) : cats[0] }, {
     onDelete: isNew ? null : async () => { DB.txns = DB.txns.filter(x => x.id !== t.id); commit(); toast('Deleted', 'trash'); }
   });
   if (!out) return;
+
+  if (out.category === NEW_CAT) {
+    const c = await formModal('New income category', [{ k: 'name', label: 'Category name', required: true, placeholder: 'e.g. Teaching' }], {}, { ok: 'Add' });
+    if (!c || !c.name.trim()) return;
+    out.category = c.name.trim();
+    if (!DB.incomeCats.includes(out.category)) DB.incomeCats.push(out.category);
+  }
+
   out.type = 'income';
-  out.category = out.source || 'Income';
+  out.source = out.category;
   out.amount = Math.abs(Number(out.amount) || 0);
   if (isNew) DB.txns.push({ id: uid(), ...out });
   else Object.assign(DB.txns.find(x => x.id === t.id), out);
@@ -2198,42 +2270,145 @@ async function editIncome(t) {
   toast(`${isNew ? 'Logged' : 'Updated'} income ${money(out.amount)}`, 'check');
 }
 
-/* ---------- CSV, including your own Google Form responses ---------- */
+/* ---------- CSV, including your own Google Form responses ----------
+
+   Google Forms writes dates the way your account is set: 30/07/2026 is
+   the 30th of July, not the 7th of the 30th month. Guessing wrong either
+   drops the row or files it under the wrong month, silently — so the
+   order is detected, shown to you, and confirmed before anything lands. */
+
+function parseDMY(str, order) {
+  const s = String(str || '').trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);          // already ISO
+  if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (m) {
+    let [, a, b, y] = m;
+    a = +a; b = +b; y = +y;
+    if (y < 100) y += 2000;
+    const day = order === 'mdy' ? b : a;
+    const mon = order === 'mdy' ? a : b;
+    if (mon < 1 || mon > 12 || day < 1 || day > 31) return null;
+    return `${y}-${pad(mon)}-${pad(day)}`;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : ymd(d);
+}
+
+/* if any first number is over 12 it can only be a day, and vice versa */
+function detectDateOrder(values) {
+  let dmy = 0, mdy = 0;
+  values.forEach(v => {
+    const m = String(v || '').trim().match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-]/);
+    if (!m) return;
+    if (+m[1] > 12) dmy++;
+    if (+m[2] > 12) mdy++;
+  });
+  if (dmy && !mdy) return { order: 'dmy', sure: true };
+  if (mdy && !dmy) return { order: 'mdy', sure: true };
+  return { order: 'dmy', sure: false };
+}
+
+const txnKey = t => [t.date, Number(t.amount).toFixed(2), (t.category || '').trim().toLowerCase(),
+  (t.reason || '').trim().toLowerCase().slice(0, 60)].join('|');
+
 async function importCSV() {
   const f = await pickFile('.csv,text/csv');
   if (!f) return;
   const rows = parseCSV(f.text);
   if (rows.length < 2) return toast('That file looks empty', 'x');
+
   const head = rows[0].map(x => x.trim().toLowerCase());
   const find = (...names) => head.findIndex(hd => names.some(n => hd.includes(n)));
-  const iD = find('date of expense', 'date received', 'date', 'timestamp');
-  const iA = find('amount spent', 'amount', 'cost', 'price', 'total', 'value');
-  const iC = find('category of expense', 'category', 'kind', 'tag');
-  const iS = find('how did you pay', 'payment', 'source', 'where did it come');
-  const iR = find('reason for expense', 'reason', 'note', 'desc', 'detail');
-  const iE = find('essential', 'scale of 1-5');
-  const iT = find('income/expense', 'in/out', 'direction', 'type');
-  if (iD < 0 || iA < 0) return toast('Need at least a date column and an amount column', 'x');
+  const iD = find('date of expense', 'date received', 'date'),
+        iA = find('amount spent', 'amount', 'cost', 'price', 'total', 'value'),
+        iC = find('category of expense', 'category', 'kind', 'tag'),
+        iS = find('how did you pay', 'payment', 'paid from', 'source', 'where did it come'),
+        iR = find('reason for expense', 'reason', 'note', 'desc', 'detail'),
+        iE = find('essential', 'scale of 1-5'),
+        iT = find('income/expense', 'in/out', 'direction', 'type');
+  if (iD < 0 || iA < 0) return toast('I need a date column and an amount column', 'x');
 
-  let n = 0;
-  rows.slice(1).forEach(r => {
-    const raw = String(r[iA] || '').replace(/[^0-9.\-]/g, '');
-    const amt = Number(raw); if (!raw || isNaN(amt)) return;
-    const d = new Date(r[iD]); if (isNaN(d)) return;
-    const income = iT >= 0 && /in(come)?|credit/i.test(r[iT] || '');
-    const ess = iE >= 0 ? Number(String(r[iE]).replace(/[^0-9]/g, '')) : NaN;
-    DB.txns.push({
-      id: uid(), date: ymd(d), amount: Math.abs(amt),
-      type: income ? 'income' : 'expense',
-      category: (iC >= 0 && r[iC]) ? String(r[iC]).trim() : (income ? 'Income' : 'Uncategorised'),
-      source: iS >= 0 ? String(r[iS] || '').trim() : '',
-      reason: iR >= 0 ? String(r[iR] || '').trim() : '',
-      essential: ess >= 1 && ess <= 5 ? ess : null,
+  const body = rows.slice(1).filter(r => String(r[iD] || '').trim() && String(r[iA] || '').trim());
+  const detected = detectDateOrder(body.map(r => r[iD]));
+  const existing = new Set(DB.txns.map(txnKey));
+
+  const build = (order) => {
+    const ok = [], bad = [], dupe = [];
+    body.forEach(r => {
+      const date = parseDMY(r[iD], order);
+      const raw = String(r[iA] || '').replace(/[^0-9.\-]/g, '');
+      const amt = Number(raw);
+      if (!date || !raw || isNaN(amt)) { bad.push(String(r[iD] || '') + ' · ' + String(r[iA] || '')); return; }
+      const income = iT >= 0 && /in(come)?|credit/i.test(r[iT] || '');
+      const ess = iE >= 0 ? Number(String(r[iE]).replace(/[^0-9]/g, '')) : NaN;
+      const t = {
+        id: uid(), date, amount: Math.abs(amt), type: income ? 'income' : 'expense',
+        category: (iC >= 0 && r[iC]) ? String(r[iC]).trim() : (income ? 'Income' : 'Uncategorised'),
+        source: iS >= 0 ? String(r[iS] || '').trim() : '',
+        reason: iR >= 0 ? String(r[iR] || '').trim() : '',
+        essential: ess >= 1 && ess <= 5 ? ess : null,
+      };
+      (existing.has(txnKey(t)) ? dupe : ok).push(t);
     });
-    n++;
+    return { ok, bad, dupe };
+  };
+
+  let order = detected.order;
+  let res = build(order);
+
+  /* show what will happen before it happens */
+  const box = h('div', {});
+  const draw = () => {
+    box.innerHTML = '';
+    const sample = res.ok[0] || res.dupe[0];
+    const span = res.ok.length ? (() => {
+      const ds = res.ok.map(t => t.date).sort();
+      return `${fmtDate(ds[0], { day: 'numeric', month: 'long', year: 'numeric' })} → ${fmtDate(ds[ds.length - 1], { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    })() : '—';
+    box.append(
+      h('div', { class: 'tiny', style: { marginBottom: '12px' }, text: `${body.length} rows in the file.` }),
+      h('label', { class: 'fld' }, h('span', { class: 'lb', text: 'How the dates are written' }), (() => {
+        const sel = h('select', { class: 'inp' });
+        sel.append(h('option', { value: 'dmy', text: 'Day / Month / Year  —  30/07/2026 is 30 July' }));
+        sel.append(h('option', { value: 'mdy', text: 'Month / Day / Year  —  07/30/2026 is 30 July' }));
+        sel.value = order;
+        sel.onchange = () => { order = sel.value; res = build(order); draw(); };
+        return sel;
+      })(),
+        h('div', { class: 'tiny', style: { marginTop: '4px' },
+          text: detected.sure ? 'Detected from the file itself — a number above 12 can only be a day.' : 'Every date in this file is ambiguous, so please check this is right.' })),
+      h('div', { class: 'card', style: { background: 'var(--surface-2)' } },
+        h('div', { style: { display: 'flex', gap: '18px', flexWrap: 'wrap' } },
+          h('div', {}, h('div', { class: 'mono', style: { fontSize: '20px', fontWeight: 600, color: 'var(--good)' }, text: String(res.ok.length) }), h('div', { class: 'tiny', text: 'will be added' })),
+          h('div', {}, h('div', { class: 'mono', style: { fontSize: '20px', fontWeight: 600 }, text: String(res.dupe.length) }), h('div', { class: 'tiny', text: 'already in Orbit' })),
+          h('div', {}, h('div', { class: 'mono', style: { fontSize: '20px', fontWeight: 600, color: res.bad.length ? 'var(--crit)' : 'var(--muted)' }, text: String(res.bad.length) }), h('div', { class: 'tiny', text: 'unreadable' }))),
+        h('hr', { class: 'hr' }),
+        h('div', { class: 'tiny', text: `Date range: ${span}` }),
+        sample ? h('div', { class: 'tiny', style: { marginTop: '6px' },
+          text: `First row reads as: ${fmtDate(sample.date, { day: 'numeric', month: 'long', year: 'numeric' })} · ${money(sample.amount)} · ${sample.category}` }) : null),
+      );
+    if (res.bad.length) box.append(h('div', { class: 'tiny', style: { marginTop: '10px', color: 'var(--crit)' },
+      text: 'Skipped: ' + res.bad.slice(0, 4).join(' / ') + (res.bad.length > 4 ? ` and ${res.bad.length - 4} more` : '') }));
+  };
+  draw();
+
+  await new Promise(resolve => {
+    const foot = h('div', { style: { display: 'flex', gap: '8px' } },
+      h('button', { class: 'btn', text: 'Cancel', onclick: () => { closeModal(); resolve(false); } }),
+      h('button', { class: 'btn primary', text: 'Import', onclick: () => { closeModal(); resolve(true); } }));
+    modal({ title: 'Import from CSV', bodyNode: box, footNode: foot, wide: true });
+  }).then(go => {
+    if (!go || !res.ok.length) { if (go) toast('Nothing new to import', 'x'); return; }
+    DB.txns.push(...res.ok);
+    const newest = res.ok.map(t => t.date).sort().pop();
+    Money.jumpTo = monthKey(newest);
+    commit();
+    toast(`Imported ${res.ok.length} entries${res.dupe.length ? ` · skipped ${res.dupe.length} already here` : ''}`, 'download');
   });
-  commit(); toast(`Imported ${n} row${n === 1 ? '' : 's'}`, 'download');
 }
+
 function exportCSV() {
   const rows = [['Date', 'Type', 'How did you pay for it?', 'Amount', 'Category', 'Reason', 'Essential (1-5)'],
     ...DB.txns.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -2433,11 +2608,13 @@ function incomeTab(body, st, re, d) {
   body.append(tiles);
 
   const bySrc = {};
-  inc.forEach(t => { const s = t.source || 'Other'; bySrc[s] = (bySrc[s] || 0) + t.amount; });
+  inc.forEach(t => { const s = incomeCatOf(t); bySrc[s] = (bySrc[s] || 0) + t.amount; });
   const rows = Object.entries(bySrc).sort((a, b) => b[1] - a[1]);
-  const order = [...new Set([...INCOME_SOURCES, ...DB.txns.filter(isIncome).map(t => t.source)])].filter(Boolean);
+  const order = incomeCats();
   const c1 = h('div', { class: 'card', style: { marginTop: '14px' } });
-  c1.append(h('h3', { text: 'Where it came from' }));
+  c1.append(h('div', { style: { display: 'flex', alignItems: 'center', marginBottom: '10px' } },
+    h('h3', { text: 'Where it came from', style: { margin: 0 } }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: `${icon('grid', 13)} Categories`, onclick: manageIncomeCats })));
   if (!rows.length) c1.append(h('div', { class: 'empty', style: { minHeight: '120px' }, html:
     `<div class="big">${icon('wallet', 30)}</div><div>No income logged for ${esc(monthLabel(st.month))}.<br>Use the <strong>+ Income</strong> button up top.</div>` }));
   const maxI = Math.max(1, ...rows.map(r => r[1]));
@@ -2454,11 +2631,12 @@ function incomeTab(body, st, re, d) {
   inc.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(t => {
     const tr = h('tr');
     tr.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
-      <td><span class="chip"><i class="dot" style="background:var(--good)"></i>${esc(t.source || '—')}</span></td>
+      <td><span class="chip"><i class="dot" style="background:var(--good)"></i>${esc(incomeCatOf(t))}</span></td>
       <td class="tiny">${esc(t.reason || t.note || '')}</td>
       <td class="num" style="font-weight:600;color:var(--good)">+${esc(money(t.amount))}</td>`;
-    const td = h('td', { style: { width: '34px' } });
-    td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), onclick: () => editIncome(t) }));
+    const td = h('td', { style: { width: '62px', whiteSpace: 'nowrap' } });
+    td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), title: 'Edit', onclick: () => editIncome(t) }),
+      h('button', { class: 'btn ghost sm danger', html: icon('trash', 13), title: 'Delete', onclick: () => deleteTxns([t.id]) }));
     tr.append(td); tb.append(tr);
   });
   if (!inc.length) tb.innerHTML = '<tr><td colspan="5" style="padding:28px;text-align:center;color:var(--muted)">Nothing yet.</td></tr>';
@@ -2627,78 +2805,155 @@ function budgetsTab(body, st, re, d) {
   }
 }
 
-/* ---------- ALL ENTRIES ---------- */
-function entriesTab(body, st, re, d) {
-  const { mt } = d;
-  st.filter = st.filter || 'all';
-  const bar = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' } });
-  const fseg = h('div', { class: 'seg' });
-  [['all', 'All'], ['expense', 'Expenses'], ['income', 'Income']].forEach(([k, l]) =>
-    fseg.append(h('button', { class: st.filter === k ? 'on' : '', text: l, onclick: () => { st.filter = k; re(); } })));
-  bar.append(fseg, h('span', { class: 'tiny', text: `${mt.length} in ${monthLabel(st.month)}` }), h('div', { class: 'spacer' }),
-    h('button', { class: 'btn sm', html: `${icon('upload', 13)} Export CSV`, onclick: exportCSV }));
-  body.append(bar);
-
-  const list = mt.filter(t => st.filter === 'all' || (st.filter === 'income') === isIncome(t))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-
-  const card = h('div', { class: 'card pad0' });
-  const tbl = h('table', { class: 'tbl' });
-  tbl.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Reason</th><th>Essential</th><th class="num">Amount</th><th></th></tr></thead>';
-  const tb = h('tbody');
-  list.forEach(t => {
-    const income = isIncome(t);
-    const p = payOf(t.source);
-    const tr = h('tr');
-    tr.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
-      <td><span class="chip"><i class="dot" style="background:${income ? 'var(--good)' : catColor(t.category)}"></i>${esc(t.category || '—')}</span></td>
-      <td class="tiny" style="${!income && !p.ok ? 'color:var(--crit);font-weight:600' : ''}">${income ? '—' : esc(p.short)}</td>
-      <td class="tiny" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.reason || t.note || '')}">${esc(t.reason || t.note || '')}</td>
-      <td class="tiny mono">${!income && t.essential ? `<i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${ORD[t.essential - 1]};margin-right:5px"></i>${t.essential}/5` : ''}</td>
-      <td class="num" style="font-weight:600;color:${income ? 'var(--good)' : 'var(--text)'}">${income ? '+' : ''}${esc(money(t.amount))}</td>`;
-    const td = h('td', { style: { width: '34px' } });
-    td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), onclick: () => income ? editIncome(t) : editExpense(t) }));
-    tr.append(td); tb.append(tr);
-  });
-  if (!list.length) tb.innerHTML = '<tr><td colspan="7" style="padding:34px;text-align:center;color:var(--muted)">Nothing recorded this month.</td></tr>';
-  tbl.append(tb); card.append(tbl);
-  body.append(card);
+/* ---------- deleting, one or many ---------- */
+async function deleteTxns(ids, quiet) {
+  const chosen = DB.txns.filter(t => ids.includes(t.id));
+  if (!chosen.length) return false;
+  const sum = chosen.reduce((a, t) => a + t.amount, 0);
+  const ok = quiet || await confirmModal(
+    chosen.length === 1 ? 'Delete this entry?' : `Delete ${chosen.length} entries?`,
+    chosen.length === 1
+      ? `${money(chosen[0].amount)} · ${chosen[0].category || ''}${chosen[0].reason ? ' · ' + chosen[0].reason.slice(0, 60) : ''}`
+      : `${money(sum)} in total, between ${fmtDate(chosen.map(t => t.date).sort()[0])} and ${fmtDate(chosen.map(t => t.date).sort().pop())}. This cannot be undone.`,
+    'Delete');
+  if (!ok) return false;
+  DB.txns = DB.txns.filter(t => !ids.includes(t.id));
+  commit();
+  toast(`Deleted ${chosen.length} ${chosen.length === 1 ? 'entry' : 'entries'}`, 'trash');
+  return true;
 }
 
-/* ---------- category manager ---------- */
-function manageCats() {
+async function recategorise(ids) {
+  const chosen = DB.txns.filter(t => ids.includes(t.id));
+  if (!chosen.length) return;
+  const anyIncome = chosen.some(isIncome);
+  const cats = anyIncome && chosen.every(isIncome) ? incomeCats() : expenseCats();
+  const o = await formModal(`Move ${chosen.length} ${chosen.length === 1 ? 'entry' : 'entries'} to…`,
+    [{ k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) }], {}, { ok: 'Move them' });
+  if (!o) return;
+  chosen.forEach(t => { t.category = o.category; if (isIncome(t)) t.source = o.category; });
+  commit();
+  toast(`Moved ${chosen.length} to ${o.category}`, 'check');
+}
+
+function manageIncomeCats() {
   const body = h('div', {});
   const list = h('div', { style: { marginBottom: '14px' } });
   const draw = () => {
     list.innerHTML = '';
-    expenseCats().forEach(c => {
-      const inUse = DB.txns.some(t => !isIncome(t) && t.category === c);
+    incomeCats().forEach(c => {
+      const inUse = DB.txns.some(t => isIncome(t) && incomeCatOf(t) === c);
       const row = h('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--border)' } });
       row.append(
-        h('i', { style: { width: '10px', height: '10px', borderRadius: '3px', background: catColor(c), flex: '0 0 auto' } }),
+        h('i', { style: { width: '10px', height: '10px', borderRadius: '3px', background: 'var(--good)', flex: '0 0 auto' } }),
         h('span', { text: c, style: { flex: '1', fontSize: '13px' } }),
         inUse ? h('span', { class: 'tiny', text: 'in use' }) : null,
-        h('button', {
-          class: 'btn ghost sm', html: icon('trash', 12), title: inUse ? 'Still used by some entries' : 'Remove',
+        h('button', { class: 'btn ghost sm', html: icon('trash', 12),
           style: { opacity: inUse ? .35 : 1, pointerEvents: inUse ? 'none' : 'auto' },
-          onclick: () => { DB.cats = expenseCats().filter(x => x !== c); save(); draw(); refresh(); }
-        }));
+          onclick: () => { DB.incomeCats = incomeCats().filter(x => x !== c); save(); draw(); refresh(); } }));
       list.append(row);
     });
   };
   draw();
-  const inp = h('input', { class: 'inp', placeholder: 'Add a category and press Enter' });
+  const inp = h('input', { class: 'inp', placeholder: 'Add an income category and press Enter' });
   inp.onkeydown = e => {
     if (e.key !== 'Enter') return;
     const v = inp.value.trim(); if (!v) return;
-    if (!DB.cats) DB.cats = EXPENSE_CATS.slice();
-    if (!DB.cats.includes(v)) DB.cats.push(v);
+    if (!DB.incomeCats) DB.incomeCats = INCOME_SOURCES.slice();
+    if (!DB.incomeCats.includes(v)) DB.incomeCats.push(v);
     inp.value = ''; save(); draw(); refresh();
   };
-  body.append(list, inp,
-    h('div', { class: 'tiny', style: { marginTop: '8px' }, text: 'A category that still has entries cannot be removed — change those entries first.' }));
-  modal({ title: 'Spending categories', bodyNode: body,
+  body.append(list, inp);
+  modal({ title: 'Income categories', bodyNode: body,
     footNode: h('button', { class: 'btn primary', text: 'Done', onclick: closeModal }) });
+}
+
+/* ---------- ALL ENTRIES ---------- */
+function entriesTab(body, st, re, d) {
+  const { mt } = d;
+  st.filter = st.filter || 'all';
+  st.picked = st.picked || new Set();
+
+  const list = mt.filter(t => st.filter === 'all' || (st.filter === 'income') === isIncome(t))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const visible = new Set(list.map(t => t.id));
+  [...st.picked].forEach(id => { if (!visible.has(id)) st.picked.delete(id); });
+
+  const bar = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' } });
+  const fseg = h('div', { class: 'seg' });
+  [['all', 'All'], ['expense', 'Expenses'], ['income', 'Income']].forEach(([k, l]) =>
+    fseg.append(h('button', { class: st.filter === k ? 'on' : '', text: l, onclick: () => { st.filter = k; st.picked.clear(); re(); } })));
+  bar.append(fseg, h('span', { class: 'tiny', text: `${list.length} in ${monthLabel(st.month)}` }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: `${icon('upload', 13)} Export CSV`, onclick: exportCSV }));
+  body.append(bar);
+
+  /* the bulk bar only exists while something is ticked */
+  if (st.picked.size) {
+    const ids = [...st.picked];
+    const sum = DB.txns.filter(t => st.picked.has(t.id)).reduce((a, t) => a + t.amount, 0);
+    const sel = h('div', { class: 'card', style: {
+      marginBottom: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px',
+      flexWrap: 'wrap', background: 'var(--accent-soft)', borderColor: 'var(--accent)' } });
+    sel.append(
+      h('strong', { style: { fontSize: '13.5px' }, text: `${st.picked.size} selected` }),
+      h('span', { class: 'tiny mono', text: money(sum) }),
+      h('div', { class: 'spacer' }),
+      h('button', { class: 'btn sm', html: `${icon('grid', 13)} Change category`, onclick: () => recategorise(ids) }),
+      h('button', { class: 'btn sm', text: 'Clear', onclick: () => { st.picked.clear(); re(); } }),
+      h('button', { class: 'btn primary sm', style: { background: 'var(--crit)' }, html: `${icon('trash', 13)} Delete ${st.picked.size}`,
+        onclick: async () => { if (await deleteTxns(ids)) st.picked.clear(); } }));
+    body.append(sel);
+  }
+
+  const card = h('div', { class: 'card pad0' });
+  const tbl = h('table', { class: 'tbl' });
+  const thead = h('thead');
+  const hr = h('tr');
+  const allTicked = list.length && list.every(t => st.picked.has(t.id));
+  const master = h('input', { type: 'checkbox', style: { accentColor: 'var(--accent-fill)', cursor: 'pointer' }, title: 'Select everything shown' });
+  master.checked = !!allTicked;
+  master.onchange = () => { if (master.checked) list.forEach(t => st.picked.add(t.id)); else st.picked.clear(); re(); };
+  hr.append(h('th', { style: { width: '34px' } }, master));
+  ['Date', 'Category', 'Paid from', 'Reason', 'Essential'].forEach(x => hr.append(h('th', { text: x })));
+  hr.append(h('th', { class: 'num', text: 'Amount' }), h('th', { style: { width: '62px' } }));
+  thead.append(hr); tbl.append(thead);
+
+  const tb = h('tbody');
+  list.forEach(t => {
+    const income = isIncome(t);
+    const p = payOf(t.source);
+    const on = st.picked.has(t.id);
+    const tr = h('tr', { style: on ? { background: 'var(--accent-soft)' } : {} });
+
+    const cbTd = h('td');
+    const cb = h('input', { type: 'checkbox', style: { accentColor: 'var(--accent-fill)', cursor: 'pointer' } });
+    cb.checked = on;
+    cb.onchange = () => { cb.checked ? st.picked.add(t.id) : st.picked.delete(t.id); re(); };
+    cbTd.append(cb);
+    tr.append(cbTd);
+
+    const cells = h('template');
+    cells.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
+      <td><span class="chip"><i class="dot" style="background:${income ? 'var(--good)' : catColor(t.category)}"></i>${esc((income ? incomeCatOf(t) : t.category) || '—')}</span></td>
+      <td class="tiny" style="${!income && !p.ok ? 'color:var(--crit);font-weight:600' : ''}">${income ? '—' : esc(p.short)}</td>
+      <td class="tiny" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.reason || t.note || '')}">${esc(t.reason || t.note || '')}</td>
+      <td class="tiny mono">${!income && t.essential ? `<i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${ORD[t.essential - 1]};margin-right:5px"></i>${t.essential}/5` : ''}</td>
+      <td class="num" style="font-weight:600;color:${income ? 'var(--good)' : 'var(--text)'}">${income ? '+' : ''}${esc(money(t.amount))}</td>`;
+    tr.append(...cells.content.childNodes);
+
+    const td = h('td', { style: { whiteSpace: 'nowrap' } });
+    td.append(
+      h('button', { class: 'btn ghost sm', html: icon('edit', 13), title: 'Edit', onclick: () => income ? editIncome(t) : editExpense(t) }),
+      h('button', { class: 'btn ghost sm danger', html: icon('trash', 13), title: 'Delete', onclick: () => deleteTxns([t.id]) }));
+    tr.append(td);
+    tb.append(tr);
+  });
+  if (!list.length) tb.innerHTML = '<tr><td colspan="8" style="padding:34px;text-align:center;color:var(--muted)">Nothing recorded this month.</td></tr>';
+  tbl.append(tb); card.append(tbl);
+  body.append(card);
+
+  if (list.length) body.append(h('div', { class: 'tiny', style: { marginTop: '10px' },
+    text: 'Tick the boxes to delete or recategorise several at once. The box in the header selects everything shown.' }));
 }
 
 /* kept so older callers (Spotlight) still work */
@@ -2979,41 +3234,80 @@ const AppVision = {
   }
 };
 
+/* a ring, because a number climbing round a circle feels different
+   from a number sitting in a box */
+function ring(pct, color, label, size = 62) {
+  const r = size / 2 - 5, C = 2 * Math.PI * r;
+  const w = h('div', { class: 'ring', style: { width: size + 'px', height: size + 'px' } });
+  w.innerHTML = `<svg width="${size}" height="${size}">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="5"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"
+      stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - Math.min(1, pct / 100))}"
+      style="transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.3,1)"/>
+  </svg><div class="pct">${esc(label)}</div>`;
+  return w;
+}
+
 function visionOverview(body, v, re, st) {
   const t25 = turns25();
+  const totalHours = v.pillars.filter(p => p.goalType === 'hours').reduce((a, p) => a + pillarLogged(p), 0);
 
-  /* the hero — motto, countdown, who you are becoming */
-  const hero = h('div', { class: 'card', style: {
-    background: 'linear-gradient(135deg, color-mix(in srgb, var(--plum) 26%, transparent), transparent 70%)',
-    borderColor: 'var(--plum)', padding: '20px 22px' } });
-  if (v.motto) hero.append(h('div', { style: { fontSize: '22px', fontWeight: 700, letterSpacing: '-.01em', lineHeight: '1.35' }, text: '“' + v.motto + '”' }));
-  else hero.append(h('div', { style: { fontSize: '18px', color: 'var(--muted)' }, text: 'No motto yet — the line you want to live by goes here.' }));
+  /* ---- the hero ---- */
+  const hero = h('div', { class: 'vision-hero' });
+  hero.append(h('div', { class: 'vision-motto',
+    text: v.motto ? '\u201c' + v.motto + '\u201d' : 'Write the line you want to live by.' }));
 
   if (t25) {
-    const row = h('div', { style: { display: 'flex', gap: '26px', marginTop: '16px', flexWrap: 'wrap', alignItems: 'baseline' } });
-    row.append(
-      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: t25.days > 0 ? t25.days.toLocaleString('en-US') : '0' }),
-        h('div', { class: 'tiny', text: t25.days > 0 ? `days until you turn 25 · ${fmtDate(t25.date, { month: 'long', day: 'numeric', year: 'numeric' })}` : 'you are 25' })),
-      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: t25.age.toFixed(1) }),
-        h('div', { class: 'tiny', text: 'years old today' })),
-      h('div', {}, h('div', { class: 'mono', style: { fontSize: '30px', fontWeight: 600 }, text: Math.max(0, Math.round(t25.days / 7)).toLocaleString('en-US') }),
-        h('div', { class: 'tiny', text: 'weeks left to become him' })));
-    hero.append(row);
+    const nums = h('div', { class: 'vision-nums' });
+    [[t25.days > 0 ? t25.days.toLocaleString('en-US') : '0', 'days until 25', true],
+     [Math.max(0, Math.round(t25.days / 7)).toLocaleString('en-US'), 'weeks left', false],
+     [t25.age.toFixed(1), 'years old today', false],
+     [Math.round(totalHours).toLocaleString('en-US'), 'hours logged so far', false],
+    ].forEach(([n, l, big]) => nums.append(h('div', {},
+      h('div', { class: 'vision-num' + (big ? ' big' : '') , text: n }),
+      h('div', { class: 'tiny', style: { marginTop: '4px' }, text: l }))));
+    hero.append(nums);
   } else {
-    hero.append(h('button', { class: 'btn sm', style: { marginTop: '14px' }, html: `${icon('calendar', 13)} Add your birthday for the countdown`, onclick: editVisionMeta }));
+    hero.append(h('button', { class: 'btn sm', style: { marginTop: '16px' },
+      html: `${icon('calendar', 13)} Add your birthday to start the countdown`, onclick: editVisionMeta }));
   }
-  if (v.statement) hero.append(h('hr', { class: 'hr' }), h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.75', color: 'var(--text-2)' }, text: v.statement }));
+  if (v.statement) hero.append(h('hr', { class: 'hr' }),
+    h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '14.5px' }, text: v.statement }));
   body.append(hero);
 
-  /* traits — who he is, not what he does */
+  /* ---- one square per week, birth to 25 ---- */
+  if (t25) {
+    const born = fromYmd(v.birthday);
+    const lived = Math.max(0, Math.floor((new Date() - born) / (7 * DAY)));
+    const total = 25 * 52;
+    const card = h('div', { class: 'card', style: { marginTop: '14px' } });
+    card.append(h('h3', { text: 'Every week you get before 25' }));
+    const grid = h('div', { class: 'wk-grid' });
+    for (let i = 0; i < total; i++) {
+      const isNow = i === lived;
+      const cell = h('div', { class: 'wk' + (i < lived ? ' lived' : '') + (isNow ? ' now' : '') });
+      if (i < lived) cell.style.opacity = (0.35 + 0.65 * (i / Math.max(1, lived))).toFixed(2);
+      const d = new Date(born.getTime() + i * 7 * DAY);
+      cell.title = `Week ${i + 1} · age ${(i / 52).toFixed(1)} · ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+      grid.append(cell);
+    }
+    card.append(grid);
+    const left = Math.max(0, total - lived);
+    card.append(h('div', { class: 'wk-legend' },
+      h('span', { class: 'tiny', html: `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--plum);margin-right:6px"></i>${lived.toLocaleString('en-US')} lived` }),
+      h('span', { class: 'tiny', html: `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--accent);margin-right:6px"></i>this week` }),
+      h('span', { class: 'tiny', html: `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--surface-3);margin-right:6px"></i>${left.toLocaleString('en-US')} left` })));
+    body.append(card);
+  }
+
+  /* ---- traits ---- */
   const tc = h('div', { class: 'card', style: { marginTop: '14px' } });
-  tc.append(h('div', { style: { display: 'flex', alignItems: 'center', marginBottom: '10px' } },
-    h('h3', { text: 'The traits he is known for', style: { margin: 0 } }), h('div', { class: 'spacer' })));
-  const chips = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-  if (!v.traits.length) chips.append(h('div', { class: 'tiny', text: 'Nothing yet. Add the handful of words you want people to use about you.' }));
+  tc.append(h('h3', { text: 'The traits he is known for' }));
+  const chips = h('div', { style: { display: 'flex', gap: '9px', flexWrap: 'wrap' } });
+  if (!v.traits.length) chips.append(h('div', { class: 'tiny', text: 'The handful of words you want people to use about you.' }));
   v.traits.forEach(tr => {
-    const c = h('button', { class: 'chip', style: { padding: '6px 12px', fontSize: '13px' }, title: tr.note || 'Click to remove' });
-    c.innerHTML = `<i class="dot" style="background:var(--plum)"></i>${esc(tr.text)}`;
+    const c = h('button', { class: 'trait', title: 'Click to remove' });
+    c.innerHTML = `<i style="width:6px;height:6px;border-radius:99px;background:var(--plum)"></i>${esc(tr.text)}`;
     c.onclick = async () => {
       if (await confirmModal('Remove trait?', `"${tr.text}" will be removed.`, 'Remove')) {
         v.traits = v.traits.filter(x => x.id !== tr.id); commit();
@@ -3021,42 +3315,56 @@ function visionOverview(body, v, re, st) {
     };
     chips.append(c);
   });
-  const ti = h('input', { class: 'inp', placeholder: 'Add a trait and press Enter — patient, relentless, calm under pressure…', style: { marginTop: '12px' } });
-  ti.onkeydown = e => {
-    if (e.key === 'Enter' && ti.value.trim()) { v.traits.push({ id: uid(), text: ti.value.trim() }); ti.value = ''; commit(); }
-  };
+  const ti = h('input', { class: 'inp', placeholder: 'Add a trait and press Enter', style: { marginTop: '12px' } });
+  ti.onkeydown = e => { if (e.key === 'Enter' && ti.value.trim()) { v.traits.push({ id: uid(), text: ti.value.trim() }); ti.value = ''; commit(); } };
   tc.append(chips, ti);
   body.append(tc);
 
-  /* the pillars */
-  const hd = h('div', { style: { display: 'flex', alignItems: 'center', margin: '20px 0 10px' } },
-    h('h3', { text: `Pillars${v.pillars.length ? ' · ' + v.pillars.length : ''}`, style: { margin: 0, fontSize: '13px' } }), h('div', { class: 'spacer' }));
-  body.append(hd);
-
-  if (!v.pillars.length) {
-    body.append(h('div', { class: 'empty', style: { minHeight: '180px' }, html:
-      `<div class="big">${icon('compass', 32)}</div><div>No pillars yet.<br>A pillar is one thing you are willing to put a decade into.</div>` }));
-    return;
+  /* ---- what this week actually asks of you ---- */
+  const weeksLeft = t25 ? Math.max(1, Math.round(t25.days / 7)) : null;
+  const hourly = v.pillars.filter(p => p.goalType === 'hours' && p.target);
+  if (weeksLeft && hourly.length) {
+    const weekStart = addDays(today(), -6);
+    const need = hourly.reduce((a, p) => a + Math.max(0, p.target - pillarLogged(p)), 0) / weeksLeft;
+    const did = hourly.reduce((a, p) => a + (p.log || []).filter(x => x.date >= weekStart).reduce((b, x) => b + (+x.amount || 0), 0), 0);
+    const pct = need > 0 ? Math.min(100, did / need * 100) : 100;
+    const c = h('div', { class: 'card', style: { marginTop: '14px', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' } });
+    c.append(ring(pct, pct >= 100 ? 'var(--good)' : 'var(--accent)', Math.round(pct) + '%', 70));
+    c.append(h('div', { style: { flex: '1', minWidth: '200px' } },
+      h('div', { style: { fontSize: '15px', fontWeight: 700 },
+        text: pct >= 100 ? 'You are ahead this week.' : `${(need - did).toFixed(1)} hours short this week.` }),
+      h('div', { class: 'tiny', style: { marginTop: '5px' },
+        text: `To reach every hour goal by 25 you need about ${need.toFixed(1)} h a week. In the last seven days you logged ${did.toFixed(1)}.` })));
+    body.append(c);
   }
 
-  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))' } });
+  /* ---- the pillars ---- */
+  body.append(h('h3', { text: `Pillars${v.pillars.length ? ' · ' + v.pillars.length : ''}`, style: { margin: '22px 0 10px', fontSize: '13px' } }));
+  if (!v.pillars.length) {
+    body.append(h('div', { class: 'empty', style: { minHeight: '160px' }, html:
+      `<div class="big">${icon('compass', 32)}</div><div>A pillar is one thing you are willing to<br>put a decade into. Add the first.</div>` }));
+    return;
+  }
+  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))' } });
   v.pillars.forEach(p => {
     const done = pillarLogged(p);
     const pct = p.target ? Math.min(100, done / p.target * 100) : 0;
     const ms = p.milestones || [];
     const nextMs = ms.filter(m => !m.done).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')))[0];
-    const card = h('div', { class: 'trip-card', onclick: () => { st.sel = p.id; re(); } });
-    card.innerHTML = `
-      <div class="trip-hero" style="height:66px;background:linear-gradient(135deg,${p.color},color-mix(in srgb, ${p.color} 50%, #000))">
-        ${p.goalType !== 'none' && p.target ? `<span class="cd">${pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)}%</span>` : ''}
-        <h4>${esc(p.name)}</h4></div>
-      <div style="padding:12px 14px">
-        ${p.goalType === 'none'
-          ? `<div class="tiny">${ms.filter(m => m.done).length}/${ms.length} milestones reached</div>`
-          : `<div class="mono" style="font-size:15px;font-weight:600">${done.toLocaleString('en-US', { maximumFractionDigits: 1 })}<span class="tiny" style="font-weight:400"> of ${(p.target || 0).toLocaleString('en-US')} ${esc(pillarUnit(p))}</span></div>`}
-        <div class="prog" style="margin-top:8px"><i style="width:${pct}%;background:${p.color}"></i></div>
-        <div class="tiny" style="margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nextMs ? 'Next: ' + esc(nextMs.text) : (p.why ? esc(p.why.split('\\n')[0]) : '&nbsp;')}</div>
-      </div>`;
+    const card = h('div', { class: 'pillar-card', style: { '--pc': p.color }, onclick: () => { st.sel = p.id; re(); } });
+    card.style.setProperty('--pc', p.color);
+    const top = h('div', { style: { display: 'flex', alignItems: 'center', gap: '14px' } });
+    top.append(
+      ring(p.goalType === 'none' ? (ms.length ? ms.filter(m => m.done).length / ms.length * 100 : 0) : pct, p.color,
+        p.goalType === 'none' ? `${ms.filter(m => m.done).length}/${ms.length}` : (pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)) + '%'),
+      h('div', { style: { minWidth: 0, flex: '1' } },
+        h('div', { style: { fontSize: '15px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: p.name }),
+        h('div', { class: 'tiny mono', style: { marginTop: '3px' },
+          text: p.goalType === 'none' ? `${ms.length} milestones`
+            : `${done.toLocaleString('en-US', { maximumFractionDigits: 1 })} of ${(p.target || 0).toLocaleString('en-US')} ${pillarUnit(p)}` })));
+    card.append(top);
+    card.append(h('div', { class: 'tiny', style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      text: nextMs ? 'Next: ' + nextMs.text : (p.why ? p.why.split('\n')[0] : ' ') }));
     grid.append(card);
   });
   body.append(grid);
