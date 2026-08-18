@@ -40,6 +40,7 @@
   --grid:#33223c; --axis:#452e4f;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --ord1:#9ec5f4; --ord2:#6da7ec; --ord3:#3987e5; --ord4:#256abf; --ord5:#184f95;
   --shadow-win:0 1px 2px rgba(0,0,0,.45), 0 18px 50px -12px rgba(10,2,14,.8);
   --shadow-pop:0 12px 40px -8px rgba(10,2,14,.65);
   --r-win:14px; --r-md:10px; --r-sm:7px;
@@ -68,6 +69,7 @@ html[data-theme="light"]{
   --grid:#e4d6c5; --axis:#ccbaa7;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --ord1:#86b6ef; --ord2:#5598e7; --ord3:#2a78d6; --ord4:#1c5cab; --ord5:#104281;
   --shadow-win:0 1px 2px rgba(60,26,52,.10), 0 18px 44px -14px rgba(60,26,52,.28);
   --shadow-pop:0 12px 36px -10px rgba(60,26,52,.24);
 }
@@ -460,7 +462,7 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
   .side{flex-basis:150px}
   .side.wide{flex-basis:170px}
   .hb-name{flex-basis:108px}
-  .bar-row{grid-template-columns:92px 1fr 76px}
+  .bar-row{grid-template-columns:minmax(0,110px) 1fr 80px}
 }
 @media (max-width:560px){
   .win{border-radius:0}
@@ -643,11 +645,12 @@ const DEFAULTS = () => ({
   settings: {
     osName: 'Orbit', user: '', theme: 'dark', accent: '#c9265a', wall: 'aurora',
     currency: '$', weekStart: 0, pomo: { focus: 25, short: 5, long: 15 },
-    googleClientId: '', googleOn: false, gCal: true, gDrive: true, gLast: ''
+    googleClientId: '', googleOn: false, gCal: true, gDrive: true, gLast: '',
+    gWriteCal: '', hiddenCals: []
   },
   events: [], tasks: [], projects: [], notes: [], journal: [], habits: [],
   sessions: [], txns: [], budgets: {}, trips: [],
-  gTrash: [], driveId: '', savedAt: ''
+  gTrash: [], gcals: [], catPalette: {}, driveId: '', savedAt: ''
 });
 
 let DB = DEFAULTS();
@@ -877,7 +880,16 @@ function field(f, val) {
       const [v, l] = Array.isArray(o) ? o : [o, o];
       inp.append(h('option', { value: v, text: l }));
     });
-  } else inp = h('input', { class: 'inp', type: f.type || 'text', placeholder: f.placeholder || '', step: f.step, min: f.min });
+  } else {
+    inp = h('input', { class: 'inp', type: f.type || 'text', placeholder: f.placeholder || '', step: f.step, min: f.min });
+    if (f.suggest && f.suggest.length) {
+      const lid = 'dl-' + f.k + '-' + uid();
+      const dl = h('datalist', { id: lid });
+      f.suggest.forEach(o => dl.append(h('option', { value: o })));
+      inp.setAttribute('list', lid);
+      wrap.append(dl);
+    }
+  }
   inp.name = f.k;
   if (val != null) inp.value = val;
   else if (f.def != null) inp.value = f.def;
@@ -1038,22 +1050,43 @@ function seed() {
     }
   });
 
-  const cats = ['Groceries', 'Rent', 'Transport', 'Dining', 'Utilities', 'Shopping', 'Health', 'Subscriptions'];
-  const amts = [[38, 96], [1250, 1250], [8, 42], [14, 68], [45, 120], [18, 140], [20, 90], [7, 16]];
+  /* spending, in the shape of your own expense form */
+  const plan = [
+    ['Food & Drink', 6, 12, 3, 'Lunch out', 'Coffee and a sandwich', 'Groceries for the week'],
+    ['Transportation', 3, 9, 4, 'Metro top-up', 'Taxi home, too late for the bus'],
+    ['Digital Tools', 12, 45, 3, 'Monthly subscription', 'Design tool renewal'],
+    ['Knowledge & Improving myself', 15, 90, 5, 'Course instalment', 'Book I had been putting off'],
+    ['Internet', 20, 30, 5, 'Home internet'],
+    ['Bill', 25, 120, 5, 'Electricity', 'Water'],
+    ['Healthcare (Skin or Gym)', 20, 70, 4, 'Gym membership', 'Skin appointment'],
+    ['Clothes', 25, 110, 2, 'A shirt I did not need', 'Shoes, finally'],
+    ['Gift', 15, 60, 3, 'Birthday present'],
+    ['Investment', 50, 200, 4, 'Monthly transfer'],
+  ];
   DB.txns = [];
   for (let k = 0; k < 190; k++) {
     const day = d(-k);
-    const n = k % 7 === 0 ? 3 : (k % 3 === 0 ? 2 : 1);
+    const n = k % 5 === 0 ? 3 : (k % 2 === 0 ? 2 : 1);
     for (let j = 0; j < n; j++) {
-      const ci = (k * 3 + j * 5) % cats.length;
-      if (cats[ci] === 'Rent' && fromYmd(day).getDate() !== 1) continue;
-      const [lo, hi] = amts[ci];
+      const row = plan[(k * 3 + j * 7) % plan.length];
+      const [cat, lo, hi, base, ...why] = row;
       const amt = Math.round((lo + ((k * 37 + j * 91) % 100) / 100 * (hi - lo)) * 100) / 100;
-      DB.txns.push({ id: uid(), date: day, amount: amt, category: cats[ci], note: '', type: 'expense' });
+      const roll = (k * 13 + j * 5) % 20;
+      const source = roll === 0 ? PAY_SOURCES[2].v : roll === 1 ? PAY_SOURCES[3].v
+        : roll === 2 ? PAY_SOURCES[1].v : roll === 3 ? PAY_SOURCES[4].v : PAY_SOURCES[0].v;
+      const wobble = ((k + j) % 3) - 1;
+      DB.txns.push({
+        id: uid(), date: day, amount: amt, category: cat, type: 'expense',
+        source, reason: why[(k + j) % why.length],
+        essential: Math.max(1, Math.min(5, base + wobble)),
+      });
     }
   }
-  for (let k = 0; k < 7; k++) DB.txns.push({ id: uid(), date: d(-15 - k * 30), amount: 3200, category: 'Salary', note: 'Monthly', type: 'income' });
-  DB.budgets = { Groceries: 450, Dining: 200, Transport: 150, Shopping: 250, Subscriptions: 60 };
+  for (let k = 0; k < 7; k++) {
+    DB.txns.push({ id: uid(), date: d(-15 - k * 30), amount: 3200, category: 'Salary', source: 'Salary', type: 'income', reason: 'Monthly pay' });
+    if (k % 2 === 0) DB.txns.push({ id: uid(), date: d(-24 - k * 30), amount: 420, category: 'Freelance / client work', source: 'Freelance / client work', type: 'income', reason: 'Side project invoice' });
+  }
+  DB.budgets = { 'Food & Drink': 320, 'Transportation': 150, 'Clothes': 200, 'Digital Tools': 90, 'Knowledge & Improving myself': 250 };
 
   DB.trips = [{
     id: uid(), name: 'Lisbon', dest: 'Lisbon, Portugal', start: d(21), end: d(28),
@@ -1093,25 +1126,33 @@ const CALS = [
   { id: 'gcal', name: 'Google', c: 'var(--s8)' },
 ];
 const calOf = id => CALS.find(c => c.id === id) || CALS[5];
-const CAL_PICK = CALS.filter(c => c.id !== 'gcal');
-const eventsOn = day => DB.events.filter(e => e.date === day)
+const gcalOf = e => (e && e.gcal) ? (DB.gcals || []).find(c => c.id === e.gcal) : null;
+const evColor = e => { const g = gcalOf(e); return g ? g.color : calOf(e.cal).c; };
+const evCalName = e => { const g = gcalOf(e); return g ? g.name : calOf(e.cal).name; };
+const calHidden = e => !!(e.gcal && (DB.settings.hiddenCals || []).includes(e.gcal));
+const eventsOn = day => DB.events.filter(e => e.date === day && !calHidden(e))
   .sort((a, b) => (a.allDay ? -1 : 1) - (b.allDay ? -1 : 1) || String(a.start || '').localeCompare(String(b.start || '')));
 
 async function editEvent(ev) {
   const isNew = !ev.id;
+  const writable = (DB.gcals || []).filter(c => !c.readOnly);
+  const useGoogle = DB.settings.googleOn && writable.length;
+  const calField = useGoogle
+    ? { k: 'gcal', label: 'Calendar', type: 'select', options: [['', 'Orbit only — not synced'], ...writable.map(c => [c.id, c.name])] }
+    : { k: 'cal', label: 'Calendar', type: 'select', options: CALS.filter(c => c.id !== 'gcal').map(c => [c.id, c.name]) };
   const out = await formModal(isNew ? 'New event' : 'Edit event', [
     { k: 'title', label: 'Title', required: true, placeholder: 'What is it?' },
     { type: 'row', fields: [
       { k: 'date', label: 'Date', type: 'date' },
-      { k: 'cal', label: 'Calendar', type: 'select', options: CALS.map(c => [c.id, c.name]) }] },
+      calField] },
     { type: 'row', fields: [
       { k: 'start', label: 'Start', type: 'time' },
       { k: 'end', label: 'End', type: 'time' }] },
     { k: 'loc', label: 'Location', placeholder: 'Optional' },
     { k: 'notes', label: 'Notes', type: 'textarea', rows: 3 },
-  ], { date: today(), cal: 'personal', ...ev }, {
+  ], { date: today(), cal: 'personal', gcal: (useGoogle ? (ev.gcal || DB.settings.gWriteCal || '') : ''), ...ev, gcal: ev.gcal ?? (useGoogle ? (DB.settings.gWriteCal || '') : '') }, {
     onDelete: isNew ? null : async () => {
-      if (ev.gid) (DB.gTrash ||= []).push(ev.gid);
+      if (ev.gid) (DB.gTrash ||= []).push({ gid: ev.gid, cal: ev.gcal || DB.settings.gWriteCal || 'primary' });
       DB.events = DB.events.filter(e => e.id !== ev.id); commit(); toast('Event deleted', 'trash');
       if (DB.settings.googleOn) googleSync({ silent: true });
     }
@@ -1119,6 +1160,7 @@ async function editEvent(ev) {
   if (!out) return;
   out.allDay = !out.start;
   out.dirty = true;
+  if (useGoogle) out.cal = out.gcal ? 'gcal' : (ev.cal && ev.cal !== 'gcal' ? ev.cal : 'personal');
   if (isNew) DB.events.push({ id: uid(), ...out });
   else Object.assign(DB.events.find(e => e.id === ev.id), out);
   commit(); toast(isNew ? 'Event added' : 'Event updated');
@@ -1196,11 +1238,14 @@ const AppCalendar = {
         h('button', { class: 'btn ghost sm', html: icon('right', 15), onclick: () => step(1), title: 'Next' })),
       h('h2', { text: st.view === 'month' ? `${MONTHS[cur.getMonth()]} ${cur.getFullYear()}` : `${MON[cur.getMonth()]} ${cur.getFullYear()}`, style: { marginLeft: '6px' } }),
       h('div', { class: 'spacer' }),
+      (DB.gcals || []).length ? h('button', { class: 'btn sm', html: `${icon('grid', 14)} Calendars`, title: 'Show or hide the calendar list', onclick: () => { st.showCals = st.showCals === false; re(); } }) : null,
       h('button', { class: 'btn sm', html: `${icon('download', 14)} Import .ics`, title: 'Import a Google Calendar / Outlook export', onclick: importICS }),
       h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Event`, onclick: () => editEvent({ date: st.cursor }) }));
     app.append(head);
 
     const body = h('div', { class: 'app-body nopad', style: { display: 'flex', minHeight: 0 } });
+
+    if ((DB.gcals || []).length && st.showCals !== false) body.append(calSidebar(re));
 
     if (st.view === 'month') body.append(monthView(st, re));
     else if (st.view === 'week') body.append(weekView(st, re));
@@ -1212,8 +1257,7 @@ const AppCalendar = {
 };
 
 function evChip(e, re) {
-  const c = calOf(e.cal);
-  const n = h('div', { class: 'ev', style: { borderLeftColor: c.c }, title: `${e.title}${e.loc ? ' · ' + e.loc : ''}` });
+  const n = h('div', { class: 'ev', style: { borderLeftColor: evColor(e) }, title: `${e.title} — ${evCalName(e)}${e.loc ? ' · ' + e.loc : ''}` });
   n.innerHTML = `${e.allDay || !e.start ? '' : `<span class="tm">${fmtTime(e.start).replace(':00', '')}</span>`}<span class="t">${esc(e.title)}</span>`;
   n.onclick = ev => { ev.stopPropagation(); editEvent(e); };
   return n;
@@ -1266,9 +1310,8 @@ function weekView(st, re) {
     const evs = eventsOn(key);
     if (!evs.length) list.append(h('div', { class: 'tiny', text: '—', style: { opacity: '.4', padding: '4px' } }));
     evs.forEach(e => {
-      const cc = calOf(e.cal);
       const card = h('div', {
-        style: { background: 'var(--surface-2)', borderLeft: `3px solid ${cc.c}`, borderRadius: '6px', padding: '6px 8px', cursor: 'pointer' },
+        style: { background: 'var(--surface-2)', borderLeft: `3px solid ${evColor(e)}`, borderRadius: '6px', padding: '6px 8px', cursor: 'pointer' },
         onclick: ev => { ev.stopPropagation(); editEvent(e); }
       });
       card.innerHTML = `<div style="font-size:12px;font-weight:600;line-height:1.3">${esc(e.title)}</div>${e.start ? `<div class="tiny mono">${fmtTime(e.start)}</div>` : '<div class="tiny">all day</div>'}`;
@@ -1297,17 +1340,44 @@ function agendaView(st, re) {
     const box = h('div', { class: 'agenda-day' });
     box.append(h('div', { class: 'dh', text: `${relDay(key)} · ${fmtDate(key, { weekday: 'long', month: 'long', day: 'numeric' })}` }));
     evs.forEach(e => {
-      const c = calOf(e.cal);
       const row = h('div', { class: 'agenda-ev', style: { cursor: 'pointer' }, onclick: () => editEvent(e) });
-      row.innerHTML = `<i class="bar" style="background:${c.c}"></i>
+      row.innerHTML = `<i class="bar" style="background:${evColor(e)}"></i>
         <div class="tm">${e.allDay || !e.start ? 'all day' : fmtTime(e.start)}</div>
         <div style="min-width:0"><div style="font-size:13.5px;font-weight:600">${esc(e.title)}</div>
-        <div class="tiny">${esc(c.name)}${e.loc ? ' · ' + esc(e.loc) : ''}${e.end && e.start ? ' · until ' + fmtTime(e.end) : ''}</div></div>`;
+        <div class="tiny">${esc(evCalName(e))}${e.loc ? ' · ' + esc(e.loc) : ''}${e.end && e.start ? ' · until ' + fmtTime(e.end) : ''}</div></div>`;
       box.append(row);
     });
     wrap.append(box);
   });
   return wrap;
+}
+</script>
+
+<script>
+/* the list of Google calendars, with a tick to show or hide each one */
+function calSidebar(re) {
+  const side = h('div', { class: 'side', style: { flexBasis: '196px', flexShrink: 0 } });
+  const hidden = DB.settings.hiddenCals || (DB.settings.hiddenCals = []);
+  const cals = (DB.gcals || []).filter(c => c.sync !== false);
+  side.append(h('div', { class: 'side-h', text: `Calendars · ${cals.length}` }));
+  const row = (c) => {
+    const off = hidden.includes(c.id);
+    const b = h('button', { class: 'navitem', style: { opacity: off ? .45 : 1 }, title: c.name });
+    b.innerHTML = `<i style="width:11px;height:11px;border-radius:3px;flex:0 0 auto;background:${off ? 'transparent' : c.color};border:1.5px solid ${c.color}"></i>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>`;
+    b.onclick = () => {
+      const i = hidden.indexOf(c.id);
+      if (i < 0) hidden.push(c.id); else hidden.splice(i, 1);
+      commit();
+    };
+    return b;
+  };
+  cals.forEach(c => side.append(row(c)));
+  side.append(h('hr', { class: 'hr' }));
+  side.append(h('button', { class: 'navitem tiny', text: hidden.length ? 'Show all' : 'Hide all', onclick: () => {
+    DB.settings.hiddenCals = hidden.length ? [] : cals.map(c => c.id); commit();
+  } }));
+  return side;
 }
 </script>
 <script>
@@ -1861,23 +1931,75 @@ const AppFocus = {
 </script>
 <script>
 /* ============================================================
-   FINANCE
-   Charts follow the data-viz rules: one axis, categorical colour
-   tied to the category (never to its rank), direct value labels on
-   every bar (so colour is never the only channel), hover tooltips,
-   and a table view of the same numbers underneath.
+   MONEY — built around your own expense form
+
+   Same six questions you already answer: date, how you paid for it,
+   amount, category, why, and how essential it was. Plus an income
+   side, so the two halves can finally sit next to each other.
+
+   Charts follow the data-viz rules: one axis, colour tied to the
+   category's identity (never to its rank), a value printed beside
+   every bar so colour is never the only channel, hover tooltips,
+   and the same numbers available as a table.
    ============================================================ */
+
+const EXPENSE_CATS = [
+  'Knowledge & Improving myself',
+  'Clothes',
+  'Gift',
+  'Transportation',
+  'Digital Tools',
+  'Food & Drink',
+  'Healthcare (Skin or Gym)',
+  'Internet',
+  'Investment',
+  'Bill',
+];
+
+const PAY_SOURCES = [
+  { v: 'my monthly budget', short: 'Monthly budget', ok: true },
+  { v: 'my employer (through my professional network)', short: 'Employer / network', ok: true },
+  { v: 'Borrowed the money', short: 'Borrowed', ok: false },
+  { v: "my savings or investments (which I shouldn't have used)", short: 'Savings I should not have touched', ok: false },
+  { v: 'My investment', short: 'My investment', ok: true },
+];
+const payOf = v => PAY_SOURCES.find(p => p.v === v) || { v, short: v || '—', ok: true };
+
+const INCOME_SOURCES = ['Salary', 'Freelance / client work', 'Business', 'Investment return', 'Gift', 'Refund', 'Other'];
+
+const ESSENTIAL = { 1: 'Optional / luxury', 2: 'Mostly optional', 3: 'Neutral', 4: 'Fairly necessary', 5: 'Necessary / essential' };
+const ORD = ['var(--ord1)', 'var(--ord2)', 'var(--ord3)', 'var(--ord4)', 'var(--ord5)'];
+
 const SERIES = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
 const OTHER_C = 'var(--muted)';
 
-/* stable: colour follows the category's identity, alphabetically fixed,
-   so filtering or re-sorting never repaints the survivors */
-function catColorMap() {
-  const names = [...new Set(DB.txns.filter(t => t.type !== 'income').map(t => t.category || 'Uncategorised'))].sort();
-  const m = new Map();
-  names.forEach((n, i) => m.set(n, i < 8 ? SERIES[i] : OTHER_C));
-  return m;
+/* There are eight validated hues and more than eight categories, so a
+   category claims a slot the first time it shows up — biggest spenders
+   first — and keeps it for good. Colour therefore follows the category
+   itself, never its rank in whatever chart you happen to be looking at.
+   Anything left over is folded into a single grey "Other", which is what
+   that bar is for. */
+function catPalette() {
+  const map = DB.catPalette || (DB.catPalette = {});
+  const totals = {};
+  DB.txns.filter(t => !isIncome(t)).forEach(t => { const c = t.category || 'Uncategorised'; totals[c] = (totals[c] || 0) + t.amount; });
+  const fresh = Object.keys(totals).filter(c => !(c in map));
+  if (fresh.length) {
+    const taken = new Set(Object.values(map).filter(i => i >= 0));
+    fresh.sort((a, b) => totals[b] - totals[a]).forEach(c => {
+      const free = [0, 1, 2, 3, 4, 5, 6, 7].find(i => !taken.has(i));
+      if (free === undefined) { map[c] = -1; return; }
+      map[c] = free; taken.add(free);
+    });
+    save();
+  }
+  return map;
 }
+function catColor(name) {
+  const i = catPalette()[name];
+  return (i != null && i >= 0) ? SERIES[i] : OTHER_C;
+}
+
 const monthKey = s => String(s).slice(0, 7);
 const monthLabel = k => { const [y, m] = k.split('-'); return `${MONTHS[+m - 1]} ${y}`; };
 function monthsBack(n) {
@@ -1885,29 +2007,55 @@ function monthsBack(n) {
   for (let i = 0; i < n; i++) { out.unshift(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`); d.setMonth(d.getMonth() - 1); }
   return out;
 }
+const isIncome = t => t.type === 'income';
 
-async function editTxn(t) {
+/* ---------- entry forms ---------- */
+async function editExpense(t) {
   const isNew = !t.id;
-  const cats = [...new Set([...DB.txns.map(x => x.category), 'Groceries', 'Rent', 'Transport', 'Dining', 'Utilities', 'Shopping', 'Health', 'Subscriptions', 'Salary', 'Other'])].filter(Boolean).sort();
-  const out = await formModal(isNew ? 'New transaction' : 'Edit transaction', [
+  const cats = [...new Set([...EXPENSE_CATS, ...DB.txns.filter(x => !isIncome(x)).map(x => x.category)])].filter(Boolean);
+  const out = await formModal(isNew ? 'Log an expense' : 'Edit expense', [
+    { k: 'date', label: 'Date of expense', type: 'date', required: true },
+    { k: 'source', label: 'How did you pay for it?', type: 'select', options: PAY_SOURCES.map(p => [p.v, p.v]) },
     { type: 'row', fields: [
-      { k: 'type', label: 'Type', type: 'select', options: [['expense', 'Expense'], ['income', 'Income']] },
-      { k: 'amount', label: 'Amount', type: 'number', step: '0.01', required: true }] },
-    { type: 'row', fields: [
-      { k: 'date', label: 'Date', type: 'date' },
-      { k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) }] },
-    { k: 'note', label: 'Note', placeholder: 'Optional' },
-  ], { date: today(), type: 'expense', category: 'Groceries', ...t }, {
+      { k: 'amount', label: 'Amount spent', type: 'number', step: '0.01', required: true },
+      { k: 'category', label: 'Category of expense', type: 'select', options: cats.map(c => [c, c]) }] },
+    { k: 'reason', label: 'Reason for expense', type: 'textarea', rows: 3, placeholder: 'What was it for?' },
+    { k: 'essential', label: 'How essential was this purchase?', type: 'select',
+      options: [['', '— not rated —'], ...[1, 2, 3, 4, 5].map(n => [n, `${n} · ${ESSENTIAL[n]}`])] },
+  ], { date: today(), source: PAY_SOURCES[0].v, category: EXPENSE_CATS[5], essential: '', ...t }, {
     onDelete: isNew ? null : async () => { DB.txns = DB.txns.filter(x => x.id !== t.id); commit(); toast('Deleted', 'trash'); }
   });
   if (!out) return;
+  out.type = 'expense';
+  out.amount = Math.abs(Number(out.amount) || 0);
+  out.essential = out.essential === '' ? null : Number(out.essential);
+  if (isNew) DB.txns.push({ id: uid(), ...out });
+  else Object.assign(DB.txns.find(x => x.id === t.id), out);
+  commit();
+}
+
+async function editIncome(t) {
+  const isNew = !t.id;
+  const seen = [...new Set([...INCOME_SOURCES, ...DB.txns.filter(isIncome).map(x => x.source)])].filter(Boolean);
+  const out = await formModal(isNew ? 'Log income' : 'Edit income', [
+    { k: 'date', label: 'Date received', type: 'date', required: true },
+    { type: 'row', fields: [
+      { k: 'amount', label: 'Amount', type: 'number', step: '0.01', required: true },
+      { k: 'source', label: 'Where did it come from?', suggest: seen, placeholder: 'Salary, client, gift…' }] },
+    { k: 'reason', label: 'Note', type: 'textarea', rows: 3, placeholder: 'Optional' },
+  ], { date: today(), source: INCOME_SOURCES[0], ...t }, {
+    onDelete: isNew ? null : async () => { DB.txns = DB.txns.filter(x => x.id !== t.id); commit(); toast('Deleted', 'trash'); }
+  });
+  if (!out) return;
+  out.type = 'income';
+  out.category = out.source || 'Income';
   out.amount = Math.abs(Number(out.amount) || 0);
   if (isNew) DB.txns.push({ id: uid(), ...out });
   else Object.assign(DB.txns.find(x => x.id === t.id), out);
   commit();
 }
 
-/* CSV in / out — the bridge from a Google Sheet */
+/* ---------- CSV, including your own Google Form responses ---------- */
 async function importCSV() {
   const f = await pickFile('.csv,text/csv');
   if (!f) return;
@@ -1915,30 +2063,57 @@ async function importCSV() {
   if (rows.length < 2) return toast('That file looks empty', 'x');
   const head = rows[0].map(x => x.trim().toLowerCase());
   const find = (...names) => head.findIndex(hd => names.some(n => hd.includes(n)));
-  const iD = find('date', 'day'), iA = find('amount', 'cost', 'price', 'total', 'value'),
-        iC = find('category', 'type of', 'kind', 'tag'), iN = find('note', 'desc', 'item', 'detail', 'name'),
-        iT = find('income/expense', 'in/out', 'direction');
+  const iD = find('date of expense', 'date received', 'date', 'timestamp');
+  const iA = find('amount spent', 'amount', 'cost', 'price', 'total', 'value');
+  const iC = find('category of expense', 'category', 'kind', 'tag');
+  const iS = find('how did you pay', 'payment', 'source', 'where did it come');
+  const iR = find('reason for expense', 'reason', 'note', 'desc', 'detail');
+  const iE = find('essential', 'scale of 1-5');
+  const iT = find('income/expense', 'in/out', 'direction', 'type');
   if (iD < 0 || iA < 0) return toast('Need at least a date column and an amount column', 'x');
+
   let n = 0;
   rows.slice(1).forEach(r => {
-    const raw = (r[iA] || '').replace(/[^0-9.\-]/g, '');
+    const raw = String(r[iA] || '').replace(/[^0-9.\-]/g, '');
     const amt = Number(raw); if (!raw || isNaN(amt)) return;
     const d = new Date(r[iD]); if (isNaN(d)) return;
-    const t = iT >= 0 && /in(come)?|credit/i.test(r[iT] || '') ? 'income' : (amt < 0 ? 'expense' : 'expense');
-    DB.txns.push({ id: uid(), date: ymd(d), amount: Math.abs(amt), category: (iC >= 0 && r[iC]) ? r[iC].trim() : 'Uncategorised', note: iN >= 0 ? (r[iN] || '').trim() : '', type: t });
+    const income = iT >= 0 && /in(come)?|credit/i.test(r[iT] || '');
+    const ess = iE >= 0 ? Number(String(r[iE]).replace(/[^0-9]/g, '')) : NaN;
+    DB.txns.push({
+      id: uid(), date: ymd(d), amount: Math.abs(amt),
+      type: income ? 'income' : 'expense',
+      category: (iC >= 0 && r[iC]) ? String(r[iC]).trim() : (income ? 'Income' : 'Uncategorised'),
+      source: iS >= 0 ? String(r[iS] || '').trim() : '',
+      reason: iR >= 0 ? String(r[iR] || '').trim() : '',
+      essential: ess >= 1 && ess <= 5 ? ess : null,
+    });
     n++;
   });
   commit(); toast(`Imported ${n} row${n === 1 ? '' : 's'}`, 'download');
 }
 function exportCSV() {
-  const rows = [['date', 'type', 'category', 'amount', 'note'],
-    ...DB.txns.slice().sort((a, b) => a.date.localeCompare(b.date)).map(t => [t.date, t.type, t.category, t.amount, t.note || ''])];
-  downloadFile('orbit-spending.csv', rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
-  toast('Exported orbit-spending.csv', 'upload');
+  const rows = [['Date', 'Type', 'How did you pay for it?', 'Amount', 'Category', 'Reason', 'Essential (1-5)'],
+    ...DB.txns.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .map(t => [t.date, t.type || 'expense', t.source || '', t.amount, t.category || '', t.reason || t.note || '', t.essential ?? ''])];
+  downloadFile('orbit-money.csv', rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
+  toast('Exported orbit-money.csv', 'upload');
+}
+
+/* ---------- a labelled bar row, the one chart shape used throughout ---------- */
+function barRow(name, amount, max, color, tipExtra) {
+  const row = h('div', { class: 'bar-row' });
+  const track = h('div', { class: 'bar-track' });
+  track.append(h('div', { class: 'bar-fill', style: { width: Math.max(1.5, amount / Math.max(1, max) * 100) + '%', background: color } }));
+  bindTip(track, () => `<div class="tk">${esc(name)}</div><div class="tv">${esc(money(amount))}</div>${tipExtra ? `<div class="tk">${esc(tipExtra)}</div>` : ''}`);
+  row.append(
+    h('div', { class: 'nm', html: `<i style="width:8px;height:8px;border-radius:2px;background:${color};flex:0 0 auto"></i><span title="${esc(name)}">${esc(name)}</span>` }),
+    track,
+    h('div', { class: 'vl', text: money(amount) }));
+  return row;
 }
 
 const AppFinance = {
-  id: 'finance', name: 'Money', icon: 'wallet', color: '#3f7f5f', w: 980, h: 680,
+  id: 'finance', name: 'Money', icon: 'wallet', color: '#3f7f5f', w: 1000, h: 700,
   render(root, re, st) {
     st.month = st.month || monthKey(today());
     st.tab = st.tab || 'overview';
@@ -1953,152 +2128,281 @@ const AppFinance = {
       h('h2', { text: monthLabel(st.month) }),
       h('div', { class: 'spacer' }));
     const seg = h('div', { class: 'seg' });
-    [['overview', 'Overview'], ['budgets', 'Budgets'], ['txns', 'Transactions']].forEach(([k, l]) =>
+    [['overview', 'Overview'], ['income', 'Income'], ['budgets', 'Budgets'], ['txns', 'All entries']].forEach(([k, l]) =>
       seg.append(h('button', { class: st.tab === k ? 'on' : '', text: l, onclick: () => { st.tab = k; re(); } })));
     head.append(seg,
-      h('button', { class: 'btn sm', html: `${icon('download', 14)} CSV`, title: 'Import a CSV (e.g. exported from Google Sheets)', onclick: importCSV }),
-      h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Add`, onclick: () => editTxn({ date: st.month === monthKey(today()) ? today() : st.month + '-01' }) }));
+      h('button', { class: 'btn sm', html: `${icon('download', 14)} CSV`, title: 'Import a CSV — including your Google Form responses sheet', onclick: importCSV }),
+      h('button', { class: 'btn sm', html: `${icon('plus', 14)} Income`, onclick: () => editIncome({ date: st.month === monthKey(today()) ? today() : st.month + '-01' }) }),
+      h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Expense`, onclick: () => editExpense({ date: st.month === monthKey(today()) ? today() : st.month + '-01' }) }));
     app.append(head);
 
     const body = h('div', { class: 'app-body' });
     const mt = DB.txns.filter(t => monthKey(t.date) === st.month);
-    const exp = mt.filter(t => t.type !== 'income');
-    const inc = mt.filter(t => t.type === 'income');
+    const exp = mt.filter(t => !isIncome(t));
+    const inc = mt.filter(isIncome);
     const spent = exp.reduce((a, t) => a + t.amount, 0);
     const earned = inc.reduce((a, t) => a + t.amount, 0);
-    const colors = catColorMap();
 
-    if (st.tab === 'overview') {
-      /* --- stat tiles: single headline numbers, no chart needed --- */
-      const prevKey = (() => { const [y, m] = st.month.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; })();
-      const prevSpent = DB.txns.filter(t => monthKey(t.date) === prevKey && t.type !== 'income').reduce((a, t) => a + t.amount, 0);
-      const delta = prevSpent ? Math.round((spent - prevSpent) / prevSpent * 100) : 0;
-      const dim = new Date(+st.month.slice(0, 4), +st.month.slice(5, 7), 0).getDate();
-      const elapsed = st.month === monthKey(today()) ? new Date().getDate() : dim;
-      const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(158px,1fr))' } });
-      [['Spent', money(spent), prevSpent ? `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% vs ${MON[+prevKey.slice(5, 7) - 1]}` : 'no prior month', delta > 0 ? 'var(--crit)' : 'var(--good)'],
-       ['Income', money(earned), `${inc.length} entr${inc.length === 1 ? 'y' : 'ies'}`, ''],
-       ['Net', money(earned - spent), earned - spent >= 0 ? 'in the black' : 'over budget', earned - spent >= 0 ? 'var(--good)' : 'var(--crit)'],
-       ['Average / day', money(spent / Math.max(1, elapsed)), `across ${elapsed} day${elapsed === 1 ? '' : 's'}`, '']
-      ].forEach(([k, v, d, c]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d" style="${c ? `color:${c}` : ''}">${esc(d)}</div>` })));
-      body.append(tiles);
-
-      /* --- where it went: horizontal bars, direct-labelled --- */
-      const byCat = {};
-      exp.forEach(t => { const c = t.category || 'Uncategorised'; byCat[c] = (byCat[c] || 0) + t.amount; });
-      let cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-      let folded = 0;
-      if (cats.length > 8) { folded = cats.length - 7; const rest = cats.slice(7).reduce((a, c) => a + c[1], 0); cats = [...cats.slice(0, 7), ['Other', rest]]; }
-      const maxC = Math.max(1, ...cats.map(c => c[1]));
-      const chart = h('div', { class: 'card', style: { marginTop: '14px' } });
-      chart.append(h('h3', { text: 'Where the money went' }));
-      if (!cats.length) chart.append(h('div', { class: 'tiny', text: 'Nothing recorded this month.' }));
-      cats.forEach(([name, amt]) => {
-        const c = name === 'Other' ? OTHER_C : (colors.get(name) || OTHER_C);
-        const row = h('div', { class: 'bar-row' });
-        const track = h('div', { class: 'bar-track' });
-        const fill = h('div', { class: 'bar-fill', style: { width: (amt / maxC * 100) + '%', background: c } });
-        track.append(fill);
-        bindTip(track, () => `<div class="tk">${esc(name)}</div><div class="tv">${money(amt)} · ${Math.round(amt / Math.max(1, spent) * 100)}% of spend</div>`);
-        row.append(h('div', { class: 'nm', html: `<i style="width:8px;height:8px;border-radius:2px;background:${c};flex:0 0 auto"></i><span>${esc(name)}</span>` }),
-          track, h('div', { class: 'vl', text: money(amt) }));
-        chart.append(row);
-      });
-      if (folded) chart.append(h('div', { class: 'tiny', text: `${folded} smaller categories are grouped into "Other".`, style: { marginTop: '8px' } }));
-      body.append(chart);
-
-      /* --- 6-month trend: one measure, one axis --- */
-      const months = monthsBack(6);
-      const totals = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && t.type !== 'income').reduce((a, t) => a + t.amount, 0));
-      const maxM = Math.max(1, ...totals);
-      const trend = h('div', { class: 'card', style: { marginTop: '14px' } });
-      trend.append(h('h3', { text: 'Monthly spend — last 6 months' }));
-      const sp = h('div', { class: 'spark', style: { height: '96px' } });
-      months.forEach((m, i) => {
-        const bar = h('div', { class: 'sb', style: { height: Math.max(4, totals[i] / maxM * 88) + 'px', background: m === st.month ? 'var(--s1)' : 'var(--s1)', opacity: m === st.month ? 1 : .45, cursor: 'pointer' }, onclick: () => { st.month = m; re(); } });
-        bindTip(bar, () => `<div class="tk">${monthLabel(m)}</div><div class="tv">${money(totals[i])}</div>`);
-        sp.append(bar);
-      });
-      trend.append(sp);
-      const lbls = h('div', { style: { display: 'flex', gap: '3px', marginTop: '6px' } });
-      months.forEach((m, i) => lbls.append(h('div', { class: 'tiny mono', style: { flex: '1', textAlign: 'center', fontWeight: m === st.month ? 700 : 400, color: m === st.month ? 'var(--text)' : '' }, text: `${MON[+m.slice(5, 7) - 1]} ${Math.round(totals[i])}` })));
-      trend.append(lbls);
-      body.append(trend);
-    }
-
-    if (st.tab === 'budgets') {
-      const byCat = {};
-      exp.forEach(t => { const c = t.category || 'Uncategorised'; byCat[c] = (byCat[c] || 0) + t.amount; });
-      const card = h('div', { class: 'card' });
-      const hd = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } },
-        h('h3', { text: 'Monthly budgets', style: { margin: 0 } }), h('div', { class: 'spacer' }),
-        h('button', { class: 'btn sm', html: `${icon('plus', 13)} Budget`, onclick: async () => {
-          const cats = [...new Set(DB.txns.filter(t => t.type !== 'income').map(t => t.category))].filter(Boolean).sort();
-          const o = await formModal('Set a budget', [
-            { k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) },
-            { k: 'amount', label: 'Monthly limit', type: 'number', step: '1', required: true }], {});
-          if (o) { DB.budgets[o.category] = Number(o.amount); commit(); }
-        } }));
-      card.append(hd);
-      const keys = Object.keys(DB.budgets);
-      if (!keys.length) card.append(h('div', { class: 'empty', style: { minHeight: '120px' }, html: `<div>No budgets set. Add one and you'll see<br>how close you are as the month goes.</div>` }));
-      keys.sort().forEach(cat => {
-        const lim = DB.budgets[cat], used = byCat[cat] || 0, pct = Math.min(150, used / Math.max(1, lim) * 100);
-        const state = pct > 100 ? ['critical', 'var(--crit)', 'Over budget'] : pct > 80 ? ['warning', 'var(--warn)', 'Getting close'] : ['good', 'var(--good)', 'On track'];
-        const row = h('div', { style: { padding: '10px 0', borderBottom: '1px solid var(--border)' } });
-        row.innerHTML = `<div style="display:flex;align-items:center;gap:8px">
-            <i style="width:8px;height:8px;border-radius:2px;background:${colors.get(cat) || OTHER_C}"></i>
-            <strong style="font-size:13.5px">${esc(cat)}</strong>
-            <span class="chip" style="border-color:transparent;background:transparent;color:${state[1]};padding-left:0">
-              ${icon(pct > 100 ? 'bolt' : pct > 80 ? 'clock' : 'check', 12, 2.4)}${state[2]}</span>
-            <span style="flex:1"></span>
-            <span class="mono" style="font-size:13px"><strong>${money(used)}</strong> <span class="tiny">of ${money(lim)}</span></span></div>
-          <div class="budget-bar"><i style="width:${Math.min(100, pct)}%;background:${state[1]}"></i></div>`;
-        const del = h('button', { class: 'btn ghost sm', html: icon('trash', 12), style: { marginTop: '6px' }, onclick: () => { delete DB.budgets[cat]; commit(); } });
-        row.append(del);
-        card.append(row);
-      });
-      body.append(card);
-
-      const un = Object.keys(byCat).filter(c => !DB.budgets[c]).sort();
-      if (un.length) {
-        const c2 = h('div', { class: 'card', style: { marginTop: '14px' } });
-        c2.append(h('h3', { text: 'Spending with no budget' }));
-        un.forEach(c => c2.append(h('div', { style: { display: 'flex', padding: '5px 0', fontSize: '13px' } },
-          h('span', { text: c }), h('span', { class: 'spacer' }), h('span', { class: 'mono', text: money(byCat[c]) }))));
-        body.append(c2);
-      }
-    }
-
-    if (st.tab === 'txns') {
-      const bar = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' } });
-      bar.append(h('span', { class: 'tiny', text: `${mt.length} transactions in ${monthLabel(st.month)}` }), h('div', { class: 'spacer' }),
-        h('button', { class: 'btn sm', html: `${icon('upload', 13)} Export CSV`, onclick: exportCSV }));
-      body.append(bar);
-      const card = h('div', { class: 'card pad0' });
-      const tbl = h('table', { class: 'tbl' });
-      tbl.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead>';
-      const tb = h('tbody');
-      mt.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach(t => {
-        const tr = h('tr');
-        tr.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
-          <td><span class="chip"><i class="dot" style="background:${t.type === 'income' ? 'var(--good)' : (colors.get(t.category) || OTHER_C)}"></i>${esc(t.category || '—')}</span></td>
-          <td class="tiny">${esc(t.note || '')}</td>
-          <td class="num" style="font-weight:600;color:${t.type === 'income' ? 'var(--good)' : 'var(--text)'}">${t.type === 'income' ? '+' : ''}${esc(money(t.amount))}</td>`;
-        const td = h('td', { style: { width: '34px' } });
-        td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), onclick: () => editTxn(t) }));
-        tr.append(td);
-        tb.append(tr);
-      });
-      if (!mt.length) tb.innerHTML = '<tr><td colspan="5" style="padding:34px;text-align:center;color:var(--muted)">Nothing recorded this month.</td></tr>';
-      tbl.append(tb);
-      card.append(tbl);
-      body.append(card);
-    }
+    if (st.tab === 'overview') overviewTab(body, st, re, { mt, exp, inc, spent, earned });
+    if (st.tab === 'income') incomeTab(body, st, re, { inc, earned, spent });
+    if (st.tab === 'budgets') budgetsTab(body, st, re, { exp });
+    if (st.tab === 'txns') entriesTab(body, st, re, { mt });
 
     app.append(body); root.append(app);
   }
 };
+
+/* ---------- OVERVIEW ---------- */
+function overviewTab(body, st, re, d) {
+  const { exp, inc, spent, earned } = d;
+
+  const prevKey = (() => { const [y, m] = st.month.split('-').map(Number); const x = new Date(y, m - 2, 1); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; })();
+  const prevSpent = DB.txns.filter(t => monthKey(t.date) === prevKey && !isIncome(t)).reduce((a, t) => a + t.amount, 0);
+  const delta = prevSpent ? Math.round((spent - prevSpent) / prevSpent * 100) : 0;
+  const dim = new Date(+st.month.slice(0, 4), +st.month.slice(5, 7), 0).getDate();
+  const elapsed = st.month === monthKey(today()) ? new Date().getDate() : dim;
+
+  const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(158px,1fr))' } });
+  [['Spent', money(spent), prevSpent ? `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% vs ${MON[+prevKey.slice(5, 7) - 1]}` : 'no prior month', delta > 0 ? 'var(--crit)' : 'var(--good)'],
+   ['Earned', money(earned), `${inc.length} entr${inc.length === 1 ? 'y' : 'ies'}`, ''],
+   ['Net', money(earned - spent), earned - spent >= 0 ? 'you kept some' : 'spent more than you made', earned - spent >= 0 ? 'var(--good)' : 'var(--crit)'],
+   ['Average / day', money(spent / Math.max(1, elapsed)), `across ${elapsed} day${elapsed === 1 ? '' : 's'}`, '']
+  ].forEach(([k, v, s, c]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d" style="${c ? `color:${c}` : ''}">${esc(s)}</div>` })));
+  body.append(tiles);
+
+  /* the one number your form was really asking about */
+  const risky = exp.filter(t => !payOf(t.source).ok);
+  const riskySum = risky.reduce((a, t) => a + t.amount, 0);
+  if (riskySum > 0) {
+    const share = Math.round(riskySum / Math.max(1, spent) * 100);
+    const card = h('div', { class: 'card', style: { marginTop: '14px', borderColor: 'var(--crit)' } });
+    card.innerHTML = `<div style="display:flex;align-items:flex-start;gap:11px">
+      <span style="color:var(--crit);flex:0 0 auto;margin-top:1px">${icon('bolt', 19)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13.5px;color:var(--crit)">Money that did not come from your budget</div>
+        <div class="tiny" style="margin-top:3px">${risky.length} purchase${risky.length === 1 ? '' : 's'} — ${share}% of everything you spent this month — was borrowed or taken from savings.</div>
+      </div>
+      <div class="mono" style="font-size:21px;font-weight:600;color:var(--crit)">${esc(money(riskySum))}</div></div>`;
+    body.append(card);
+  }
+
+  /* where it went — by category */
+  const byCat = {};
+  exp.forEach(t => { const c = t.category || 'Uncategorised'; byCat[c] = (byCat[c] || 0) + t.amount; });
+  const pal = catPalette();
+  const named = Object.entries(byCat).filter(([c]) => pal[c] >= 0).sort((a, b) => b[1] - a[1]);
+  const spare = Object.entries(byCat).filter(([c]) => !(pal[c] >= 0));
+  const spareSum = spare.reduce((a, x) => a + x[1], 0);
+  const cats = spareSum > 0 ? [...named, ['Other', spareSum]] : named;
+  const maxC = Math.max(1, ...cats.map(c => c[1]));
+  const c1 = h('div', { class: 'card', style: { marginTop: '14px' } });
+  c1.append(h('h3', { text: 'Where the money went' }));
+  if (!cats.length) c1.append(h('div', { class: 'tiny', text: 'Nothing logged this month.' }));
+  cats.forEach(([name, amt]) => c1.append(barRow(name, amt, maxC,
+    name === 'Other' ? OTHER_C : catColor(name),
+    name === 'Other' ? spare.sort((a, b) => b[1] - a[1]).map(x => x[0]).join(', ')
+                     : `${Math.round(amt / Math.max(1, spent) * 100)}% of spend`)));
+  if (spareSum > 0) c1.append(h('div', { class: 'tiny', style: { marginTop: '8px' },
+    text: `"Other" holds ${spare.length} categor${spare.length === 1 ? 'y' : 'ies'} beyond the eight colours: ${spare.map(x => x[0]).join(', ')}.` }));
+  body.append(c1);
+
+  /* how you paid for it */
+  const bySrc = {};
+  exp.forEach(t => { const s = t.source || '—'; bySrc[s] = (bySrc[s] || 0) + t.amount; });
+  const srcRows = PAY_SOURCES.filter(p => bySrc[p.v]).map(p => [p, bySrc[p.v]])
+    .concat(Object.keys(bySrc).filter(k => !PAY_SOURCES.some(p => p.v === k)).map(k => [payOf(k), bySrc[k]]))
+    .sort((a, b) => b[1] - a[1]);
+  if (srcRows.length) {
+    const maxS = Math.max(1, ...srcRows.map(r => r[1]));
+    const c2 = h('div', { class: 'card', style: { marginTop: '14px' } });
+    c2.append(h('h3', { text: 'How you paid for it' }));
+    srcRows.forEach(([p, amt]) => {
+      const row = barRow(p.short, amt, maxS, p.ok ? 'var(--s3)' : 'var(--crit)',
+        `${Math.round(amt / Math.max(1, spent) * 100)}% of spend`);
+      if (!p.ok) row.querySelector('.nm').append(h('span', { class: 'tiny', style: { color: 'var(--crit)', flex: '0 0 auto' }, html: icon('bolt', 11, 2.4) }));
+      c2.append(row);
+    });
+    c2.append(h('div', { class: 'tiny', style: { marginTop: '8px' }, html:
+      `${icon('bolt', 11, 2.4)} marks money that came from outside your monthly budget.` }));
+    body.append(c2);
+  }
+
+  /* how essential it was */
+  const rated = exp.filter(t => t.essential >= 1 && t.essential <= 5);
+  if (rated.length) {
+    const byE = [1, 2, 3, 4, 5].map(n => rated.filter(t => t.essential === n).reduce((a, t) => a + t.amount, 0));
+    const maxE = Math.max(1, ...byE);
+    const ratedSum = byE.reduce((a, b) => a + b, 0);
+    const avg = rated.reduce((a, t) => a + t.essential * t.amount, 0) / Math.max(1, ratedSum);
+    const luxury = byE[0] + byE[1];
+    const c3 = h('div', { class: 'card', style: { marginTop: '14px' } });
+    c3.append(h('h3', { text: 'How essential it was' }));
+    [1, 2, 3, 4, 5].forEach(n => c3.append(barRow(`${n} · ${ESSENTIAL[n]}`, byE[n - 1], maxE, ORD[n - 1],
+      `${Math.round(byE[n - 1] / Math.max(1, ratedSum) * 100)}% of rated spend`)));
+    c3.append(h('div', { class: 'tiny', style: { marginTop: '9px' },
+      text: `Weighted average ${avg.toFixed(1)} out of 5. ${money(luxury)} went on things you rated optional. ${exp.length - rated.length} purchase${exp.length - rated.length === 1 ? '' : 's'} unrated.` }));
+    body.append(c3);
+  }
+
+  /* in and out, six months — two series, one axis, same unit */
+  const months = monthsBack(6);
+  const outs = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && !isIncome(t)).reduce((a, t) => a + t.amount, 0));
+  const ins = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && isIncome(t)).reduce((a, t) => a + t.amount, 0));
+  const maxM = Math.max(1, ...outs, ...ins);
+  const c4 = h('div', { class: 'card', style: { marginTop: '14px' } });
+  const legend = h('div', { style: { display: 'flex', gap: '14px', marginBottom: '10px' } },
+    h('span', { class: 'tiny', html: `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--s3);margin-right:5px"></i>Money in` }),
+    h('span', { class: 'tiny', html: `<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--s2);margin-right:5px"></i>Money out` }));
+  c4.append(h('h3', { text: 'In and out — last 6 months' }), legend);
+  const chart = h('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '10px', height: '110px' } });
+  months.forEach((m, i) => {
+    const col = h('div', { style: { flex: '1', display: 'flex', alignItems: 'flex-end', gap: '2px', height: '100%', cursor: 'pointer' }, onclick: () => { st.month = m; re(); } });
+    [[ins[i], 'var(--s3)', 'Money in'], [outs[i], 'var(--s2)', 'Money out']].forEach(([v, c, lbl]) => {
+      const bar = h('div', { style: { flex: '1', height: Math.max(3, v / maxM * 100) + '%', background: c, borderRadius: '4px 4px 0 0', opacity: m === st.month ? 1 : .5 } });
+      bindTip(bar, () => `<div class="tk">${monthLabel(m)} · ${lbl}</div><div class="tv">${money(v)}</div>`);
+      col.append(bar);
+    });
+    chart.append(col);
+  });
+  c4.append(chart);
+  const lbls = h('div', { style: { display: 'flex', gap: '10px', marginTop: '7px' } });
+  months.forEach((m, i) => lbls.append(h('div', { class: 'tiny mono', style: { flex: '1', textAlign: 'center', fontWeight: m === st.month ? 700 : 400, color: m === st.month ? 'var(--text)' : '' },
+    text: `${MON[+m.slice(5, 7) - 1]} ${Math.round(ins[i] - outs[i]) >= 0 ? '+' : ''}${Math.round(ins[i] - outs[i])}` })));
+  c4.append(lbls, h('div', { class: 'tiny', style: { marginTop: '6px' }, text: 'The number under each month is what you kept.' }));
+  body.append(c4);
+}
+
+/* ---------- INCOME ---------- */
+function incomeTab(body, st, re, d) {
+  const { inc, earned, spent } = d;
+  const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(158px,1fr))' } });
+  const months = monthsBack(6);
+  const avg = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && isIncome(t)).reduce((a, x) => a + x.amount, 0));
+  const avg6 = avg.reduce((a, b) => a + b, 0) / 6;
+  [['Earned this month', money(earned), `${inc.length} entr${inc.length === 1 ? 'y' : 'ies'}`, ''],
+   ['6-month average', money(avg6), 'per month', ''],
+   ['Kept', money(earned - spent), earned ? `${Math.round((earned - spent) / earned * 100)}% of what came in` : 'nothing recorded', earned - spent >= 0 ? 'var(--good)' : 'var(--crit)'],
+  ].forEach(([k, v, s, c]) => tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d" style="${c ? `color:${c}` : ''}">${esc(s)}</div>` })));
+  body.append(tiles);
+
+  const bySrc = {};
+  inc.forEach(t => { const s = t.source || 'Other'; bySrc[s] = (bySrc[s] || 0) + t.amount; });
+  const rows = Object.entries(bySrc).sort((a, b) => b[1] - a[1]);
+  const order = [...new Set([...INCOME_SOURCES, ...DB.txns.filter(isIncome).map(t => t.source)])].filter(Boolean);
+  const c1 = h('div', { class: 'card', style: { marginTop: '14px' } });
+  c1.append(h('h3', { text: 'Where it came from' }));
+  if (!rows.length) c1.append(h('div', { class: 'empty', style: { minHeight: '120px' }, html:
+    `<div class="big">${icon('wallet', 30)}</div><div>No income logged for ${esc(monthLabel(st.month))}.<br>Use the <strong>+ Income</strong> button up top.</div>` }));
+  const maxI = Math.max(1, ...rows.map(r => r[1]));
+  rows.forEach(([name, amt]) => {
+    const i = order.indexOf(name);
+    c1.append(barRow(name, amt, maxI, i >= 0 && i < 8 ? SERIES[i] : OTHER_C, `${Math.round(amt / Math.max(1, earned) * 100)}% of income`));
+  });
+  body.append(c1);
+
+  const c2 = h('div', { class: 'card pad0', style: { marginTop: '14px' } });
+  const tbl = h('table', { class: 'tbl' });
+  tbl.innerHTML = '<thead><tr><th>Date</th><th>Source</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead>';
+  const tb = h('tbody');
+  inc.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(t => {
+    const tr = h('tr');
+    tr.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
+      <td><span class="chip"><i class="dot" style="background:var(--good)"></i>${esc(t.source || '—')}</span></td>
+      <td class="tiny">${esc(t.reason || t.note || '')}</td>
+      <td class="num" style="font-weight:600;color:var(--good)">+${esc(money(t.amount))}</td>`;
+    const td = h('td', { style: { width: '34px' } });
+    td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), onclick: () => editIncome(t) }));
+    tr.append(td); tb.append(tr);
+  });
+  if (!inc.length) tb.innerHTML = '<tr><td colspan="5" style="padding:28px;text-align:center;color:var(--muted)">Nothing yet.</td></tr>';
+  tbl.append(tb); c2.append(tbl);
+  body.append(c2);
+}
+
+/* ---------- BUDGETS ---------- */
+function budgetsTab(body, st, re, d) {
+  const { exp } = d;
+  const byCat = {};
+  exp.forEach(t => { const c = t.category || 'Uncategorised'; byCat[c] = (byCat[c] || 0) + t.amount; });
+  const card = h('div', { class: 'card' });
+  card.append(h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } },
+    h('h3', { text: 'Monthly budgets', style: { margin: 0 } }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: `${icon('plus', 13)} Budget`, onclick: async () => {
+      const cats = [...new Set([...EXPENSE_CATS, ...DB.txns.filter(t => !isIncome(t)).map(t => t.category)])].filter(Boolean);
+      const o = await formModal('Set a budget', [
+        { k: 'category', label: 'Category', type: 'select', options: cats.map(c => [c, c]) },
+        { k: 'amount', label: 'Monthly limit', type: 'number', step: '1', required: true }], {});
+      if (o) { DB.budgets[o.category] = Number(o.amount); commit(); }
+    } })));
+  const keys = Object.keys(DB.budgets);
+  if (!keys.length) card.append(h('div', { class: 'empty', style: { minHeight: '120px' }, html:
+    '<div>No budgets set. Add one and you will see<br>how close you are as the month goes.</div>' }));
+  keys.sort().forEach(cat => {
+    const lim = DB.budgets[cat], used = byCat[cat] || 0, pct = used / Math.max(1, lim) * 100;
+    const state = pct > 100 ? ['var(--crit)', 'Over budget', 'bolt'] : pct > 80 ? ['var(--warn)', 'Getting close', 'clock'] : ['var(--good)', 'On track', 'check'];
+    const row = h('div', { style: { padding: '10px 0', borderBottom: '1px solid var(--border)' } });
+    row.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <i style="width:8px;height:8px;border-radius:2px;background:${catColor(cat)}"></i>
+        <strong style="font-size:13.5px">${esc(cat)}</strong>
+        <span class="chip" style="border-color:transparent;background:transparent;color:${state[0]};padding-left:0">${icon(state[2], 12, 2.4)}${state[1]}</span>
+        <span style="flex:1"></span>
+        <span class="mono" style="font-size:13px"><strong>${esc(money(used))}</strong> <span class="tiny">of ${esc(money(lim))}</span></span></div>
+      <div class="budget-bar"><i style="width:${Math.min(100, pct)}%;background:${state[0]}"></i></div>`;
+    row.append(h('button', { class: 'btn ghost sm', html: icon('trash', 12), style: { marginTop: '6px' }, onclick: () => { delete DB.budgets[cat]; commit(); } }));
+    card.append(row);
+  });
+  body.append(card);
+
+  const un = Object.keys(byCat).filter(c => !DB.budgets[c]).sort();
+  if (un.length) {
+    const c2 = h('div', { class: 'card', style: { marginTop: '14px' } });
+    c2.append(h('h3', { text: 'Spending with no budget' }));
+    un.forEach(c => c2.append(h('div', { style: { display: 'flex', padding: '5px 0', fontSize: '13px' } },
+      h('span', { text: c }), h('span', { class: 'spacer' }), h('span', { class: 'mono', text: money(byCat[c]) }))));
+    body.append(c2);
+  }
+}
+
+/* ---------- ALL ENTRIES ---------- */
+function entriesTab(body, st, re, d) {
+  const { mt } = d;
+  st.filter = st.filter || 'all';
+  const bar = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' } });
+  const fseg = h('div', { class: 'seg' });
+  [['all', 'All'], ['expense', 'Expenses'], ['income', 'Income']].forEach(([k, l]) =>
+    fseg.append(h('button', { class: st.filter === k ? 'on' : '', text: l, onclick: () => { st.filter = k; re(); } })));
+  bar.append(fseg, h('span', { class: 'tiny', text: `${mt.length} in ${monthLabel(st.month)}` }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn sm', html: `${icon('upload', 13)} Export CSV`, onclick: exportCSV }));
+  body.append(bar);
+
+  const list = mt.filter(t => st.filter === 'all' || (st.filter === 'income') === isIncome(t))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  const card = h('div', { class: 'card pad0' });
+  const tbl = h('table', { class: 'tbl' });
+  tbl.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Reason</th><th>Essential</th><th class="num">Amount</th><th></th></tr></thead>';
+  const tb = h('tbody');
+  list.forEach(t => {
+    const income = isIncome(t);
+    const p = payOf(t.source);
+    const tr = h('tr');
+    tr.innerHTML = `<td class="mono tiny" style="color:var(--text-2)">${esc(fmtDate(t.date, { month: 'short', day: 'numeric' }))}</td>
+      <td><span class="chip"><i class="dot" style="background:${income ? 'var(--good)' : catColor(t.category)}"></i>${esc(t.category || '—')}</span></td>
+      <td class="tiny" style="${!income && !p.ok ? 'color:var(--crit);font-weight:600' : ''}">${income ? '—' : esc(p.short)}</td>
+      <td class="tiny" style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.reason || t.note || '')}">${esc(t.reason || t.note || '')}</td>
+      <td class="tiny mono">${!income && t.essential ? `<i style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${ORD[t.essential - 1]};margin-right:5px"></i>${t.essential}/5` : ''}</td>
+      <td class="num" style="font-weight:600;color:${income ? 'var(--good)' : 'var(--text)'}">${income ? '+' : ''}${esc(money(t.amount))}</td>`;
+    const td = h('td', { style: { width: '34px' } });
+    td.append(h('button', { class: 'btn ghost sm', html: icon('edit', 13), onclick: () => income ? editIncome(t) : editExpense(t) }));
+    tr.append(td); tb.append(tr);
+  });
+  if (!list.length) tb.innerHTML = '<tr><td colspan="7" style="padding:34px;text-align:center;color:var(--muted)">Nothing recorded this month.</td></tr>';
+  tbl.append(tb); card.append(tbl);
+  body.append(card);
+}
+
+/* kept so older callers (Spotlight) still work */
+const editTxn = t => (t && isIncome(t)) ? editIncome(t) : editExpense(t);
 </script>
 <script>
 /* ============================================================
@@ -2323,13 +2627,12 @@ const AppHome = {
       h('button', { class: 'btn ghost sm', text: 'Calendar →', onclick: () => openApp('calendar') })));
     if (!evToday.length) sch.append(h('div', { class: 'tiny', text: 'Nothing scheduled. A rare and beautiful thing.' }));
     evToday.forEach(e => {
-      const c = calOf(e.cal);
       const row = h('div', { class: 'agenda-ev', style: { cursor: 'pointer', padding: '6px 0' }, onclick: () => editEvent(e) });
-      row.innerHTML = `<i class="bar" style="background:${c.c}"></i><div class="tm">${e.allDay || !e.start ? 'all day' : fmtTime(e.start)}</div>
-        <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(e.title)}</div><div class="tiny">${esc(c.name)}</div></div>`;
+      row.innerHTML = `<i class="bar" style="background:${evColor(e)}"></i><div class="tm">${e.allDay || !e.start ? 'all day' : fmtTime(e.start)}</div>
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600">${esc(e.title)}</div><div class="tiny">${esc(evCalName(e))}</div></div>`;
       sch.append(row);
     });
-    const up = DB.events.filter(e => e.date > T).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+    const up = DB.events.filter(e => e.date > T && !calHidden(e)).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
     if (up.length) {
       sch.append(h('hr', { class: 'hr' }), h('div', { class: 'tiny', style: { marginBottom: '6px', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase' }, text: 'Coming up' }));
       up.forEach(e => sch.append(h('div', { style: { display: 'flex', gap: '8px', fontSize: '12.5px', padding: '3px 0', cursor: 'pointer' }, onclick: () => editEvent(e) },
@@ -2468,8 +2771,8 @@ const AppSettings = {
         h('div', { class: 'tiny', style: { marginTop: '4px' }, html: `Create one free at <strong>console.cloud.google.com</strong> → APIs &amp; Services → Credentials → OAuth client ID → Web application, and add <code>${esc(location.origin)}</code> as an authorised JavaScript origin.` })));
 
       const status = h('div', { class: 'tiny', style: { marginBottom: '10px' } });
-      status.textContent = s.googleOn
-        ? `Connected${G.email ? ' as ' + G.email : ''}${s.gLast ? ' · last synced ' + new Date(s.gLast).toLocaleString() : ''}`
+      status.innerHTML = s.googleOn
+        ? `<span style="color:${gNeedsSignin ? 'var(--warn)' : 'var(--good)'}">●</span> ${gNeedsSignin ? 'Signed out — click Sync now to sign in again' : 'Connected'}${G.email ? ' as ' + esc(G.email) : ''}${s.gLast ? ' · last synced ' + esc(new Date(s.gLast).toLocaleString()) : ''}`
         : 'Not connected.';
       gcard.append(status);
 
@@ -2485,16 +2788,55 @@ const AppSettings = {
       });
       gcard.append(toggles);
 
+      /* which of your Google calendars belong in Orbit */
+      if (s.googleOn && (DB.gcals || []).length) {
+        const cw = h('div', { style: { marginBottom: '12px', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', overflow: 'hidden' } });
+        cw.append(h('div', { style: { padding: '8px 11px', background: 'var(--surface-3)', fontSize: '11.5px', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted)' },
+          text: `Your Google calendars — ${DB.gcals.filter(c => c.sync !== false).length} of ${DB.gcals.length} syncing` }));
+        const list = h('div', { style: { maxHeight: '210px', overflow: 'auto', padding: '5px' } });
+        DB.gcals.forEach(c => {
+          const row = h('label', { style: { display: 'flex', alignItems: 'center', gap: '9px', padding: '5px 7px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' } });
+          const cb = h('input', { type: 'checkbox' });
+          cb.checked = c.sync !== false;
+          cb.onchange = () => { c.sync = cb.checked; commit(); };
+          row.append(cb,
+            h('i', { style: { width: '11px', height: '11px', borderRadius: '3px', background: c.color, flex: '0 0 auto' } }),
+            h('span', { text: c.name, style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1' } }),
+            c.readOnly ? h('span', { class: 'tiny', text: 'read-only' }) : null,
+            c.primary ? h('span', { class: 'tiny', text: 'main' }) : null);
+          list.append(row);
+        });
+        cw.append(list);
+        gcard.append(cw);
+
+        const writable = DB.gcals.filter(c => !c.readOnly);
+        if (writable.length) {
+          const sel = h('select', { class: 'inp' });
+          writable.forEach(c => sel.append(h('option', { value: c.id, text: c.name })));
+          sel.value = s.gWriteCal || writable[0].id;
+          sel.onchange = () => { s.gWriteCal = sel.value; commit(); };
+          gcard.append(h('label', { class: 'fld' }, h('span', { class: 'lb', text: 'New events go to' }), sel));
+        }
+      }
+
       const acts = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
       if (!s.googleOn) acts.append(h('button', { class: 'btn primary', html: `${icon('link', 14)} Connect Google`, onclick: googleConnect }));
       else {
-        acts.append(h('button', { class: 'btn primary', html: `${icon('reset', 14)} Sync now`, onclick: () => googleSync() }));
+        acts.append(h('button', { class: 'btn primary', html: `${icon('reset', 14)} Sync now`, onclick: () => googleSync({ fromClick: true }) }));
         acts.append(h('button', { class: 'btn', html: `${icon('x', 14)} Disconnect`, onclick: () => { G.disconnect(); toast('Disconnected from Google', 'x'); } }));
       }
       gcard.append(acts);
-      if (G.lastError) gcard.append(h('div', { class: 'tiny', style: { marginTop: '8px', color: 'var(--crit)' }, text: 'Last error: ' + G.lastError }));
+      if (G.lastError) {
+        const ex = gExplain(G.lastError);
+        const box = h('div', { style: { marginTop: '10px', padding: '10px 12px', borderRadius: 'var(--r-sm)', background: 'var(--surface-3)', border: '1px solid var(--border)' } });
+        box.append(h('div', { style: { fontSize: '12.5px', fontWeight: 600, color: 'var(--crit)' }, text: ex.short }));
+        if (ex.fix) box.append(h('div', { class: 'tiny', style: { marginTop: '4px' }, text: ex.fix }));
+        (ex.links || []).forEach(l => box.append(h('div', { style: { marginTop: '6px' } },
+          h('a', { href: l, target: '_blank', rel: 'noopener', class: 'tiny', style: { color: 'var(--accent)', wordBreak: 'break-all' }, text: l }))));
+        gcard.append(box);
+      }
       gcard.append(h('div', { class: 'tiny', style: { marginTop: '10px' }, html:
-        'Drive sync uses the app-private folder, so Orbit can only ever see the one file it created — not the rest of your Drive. Whichever device saved most recently wins.' }));
+        'Orbit reads <strong>every</strong> calendar you tick above, not just the main one, and keeps each event in its own colour. Drive sync uses the app-private folder, so Orbit can only ever see the one file it created — not the rest of your Drive. Whichever device saved most recently wins.' }));
     }
     body.append(gcard);
 
@@ -2532,21 +2874,34 @@ const AppSettings = {
 </script>
 <script>
 /* ============================================================
-   GOOGLE — Calendar (two-way) + Drive (data sync across devices)
+   GOOGLE — Calendar (all of them, two-way) + Drive (data sync)
 
-   Runs entirely in the browser: Google Identity Services gives us an
-   access token, and we call the REST APIs straight from here. No server,
-   no secret key. It only works on an https origin (or localhost) — that
-   is Google's rule, not ours — so from a file:// page the panel explains
-   what to do instead.
+   Everything runs in the browser. Google Identity Services hands us an
+   access token and we call the REST APIs directly. No server, no secret.
+   Google only allows this from an https origin (or localhost).
+
+   The token is cached in this browser for its ~1 hour life, so a reload
+   or a background sync never needs to open a window. Popups are only
+   ever opened straight out of a real click.
    ============================================================ */
+const TOKEN_KEY = 'orbit.gtoken';
+
 const G = {
-  SCOPES: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.appdata openid email',
-  token: null, expiry: 0, client: null, email: '', busy: false, lastError: '',
+  SCOPES: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.appdata openid email',
+  token: null, expiry: 0, client: null, email: '', lastError: '',
 
   get clientId() { return (DB.settings.googleClientId || '').trim(); },
   get originOk() { return location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname); },
   get connected() { return !!this.token && Date.now() < this.expiry; },
+
+  restore() {
+    try {
+      const t = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+      if (t && t.exp > Date.now() + 60000) { this.token = t.tok; this.expiry = t.exp; this.email = t.email || ''; }
+    } catch (e) {}
+  },
+  remember() { try { localStorage.setItem(TOKEN_KEY, JSON.stringify({ tok: this.token, exp: this.expiry, email: this.email })); } catch (e) {} },
+  forget() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} },
 
   loadSdk() {
     if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -2556,13 +2911,14 @@ const G = {
       s.src = 'https://accounts.google.com/gsi/client';
       s.async = true; s.defer = true;
       s.onload = res;
-      s.onerror = () => rej(new Error('Could not reach Google. Check your connection.'));
+      s.onerror = () => rej(new Error('Could not reach Google — check your connection.'));
       document.head.append(s);
     });
     return this._sdk;
   },
 
-  async auth(interactive = true) {
+  /* Only ever called straight out of a click. */
+  async auth() {
     if (this.connected) return this.token;
     if (!this.originOk) throw new Error('Google needs an https address. See Settings → Google.');
     if (!this.clientId) throw new Error('Paste your Google Client ID in Settings → Google first.');
@@ -2571,14 +2927,19 @@ const G = {
       this.client = google.accounts.oauth2.initTokenClient({
         client_id: this.clientId,
         scope: this.SCOPES,
-        prompt: interactive ? '' : 'none',
         callback: r => {
           if (r.error) { this.lastError = r.error_description || r.error; return reject(new Error(this.lastError)); }
           this.token = r.access_token;
-          this.expiry = Date.now() + (Number(r.expires_in || 3500) - 120) * 1000;
+          this.expiry = Date.now() + (Number(r.expires_in || 3500) - 180) * 1000;
+          this.remember();
           resolve(this.token);
         },
-        error_callback: e => reject(new Error(e?.type === 'popup_closed' ? 'Sign-in window was closed.' : (e?.message || 'Sign-in failed.')))
+        error_callback: e => {
+          const t = e?.type || '';
+          if (t === 'popup_failed_to_open') return reject(new Error('POPUP_BLOCKED'));
+          if (t === 'popup_closed') return reject(new Error('Sign-in window was closed before you finished.'));
+          reject(new Error(e?.message || 'Sign-in failed.'));
+        }
       });
       this.client.requestAccessToken();
     });
@@ -2587,42 +2948,64 @@ const G = {
   disconnect() {
     try { if (this.token) google.accounts.oauth2.revoke(this.token, () => {}); } catch (e) {}
     this.token = null; this.expiry = 0; this.email = '';
+    this.forget();
     DB.settings.googleOn = false; commit();
   },
 
+  /* Never opens a popup — throws NEEDS_SIGNIN and lets the UI ask for a click. */
   async api(url, opts = {}) {
-    const tok = await this.auth(false).catch(() => this.auth(true));
-    const r = await fetch(url, {
-      ...opts,
-      headers: { Authorization: 'Bearer ' + tok, ...(opts.headers || {}) }
-    });
-    if (r.status === 401) { this.token = null; return this.api(url, opts); }
+    if (!this.connected) throw new Error('NEEDS_SIGNIN');
+    const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + this.token, ...(opts.headers || {}) } });
+    if (r.status === 401) { this.token = null; this.expiry = 0; this.forget(); throw new Error('NEEDS_SIGNIN'); }
     if (!r.ok) {
       let msg = r.status + ' ' + r.statusText;
       try { const j = await r.json(); msg = j.error?.message || msg; } catch (e) {}
+      if (r.status === 403 && /has not been used in project|is disabled/i.test(msg)) throw new Error('API_OFF:' + msg);
+      if (r.status === 403 && /insufficient|scope/i.test(msg)) throw new Error('SCOPE_MISSING');
       throw new Error(msg);
     }
     return r.status === 204 ? null : r.json();
   },
 
   async whoami() {
-    try { const j = await this.api('https://www.googleapis.com/oauth2/v3/userinfo'); this.email = j.email || ''; } catch (e) {}
+    try { const j = await this.api('https://www.googleapis.com/oauth2/v3/userinfo'); this.email = j.email || ''; this.remember(); } catch (e) {}
   },
 
-  /* ---------- Calendar ---------- */
-  toLocal(ev) {
+  /* ---------- the calendar list ----------
+     A Google account usually has many calendars, not one. We read them all
+     and let you tick which ones belong in Orbit. */
+  async fetchCalendars() {
+    const r = await this.api('https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&showHidden=false');
+    const prev = new Map((DB.gcals || []).map(c => [c.id, c]));
+    DB.gcals = (r.items || []).map(c => ({
+      id: c.id,
+      name: c.summaryOverride || c.summary || c.id,
+      color: c.backgroundColor || '#7b3f92',
+      readOnly: !['owner', 'writer'].includes(c.accessRole),
+      primary: !!c.primary,
+      /* first time we see a calendar: sync it, unless it is a holiday feed */
+      sync: prev.has(c.id) ? prev.get(c.id).sync : !/holiday|#contacts|birthday/i.test(c.id),
+    })).sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0) || a.name.localeCompare(b.name));
+    if (!DB.settings.gWriteCal || !DB.gcals.some(c => c.id === DB.settings.gWriteCal && !c.readOnly)) {
+      DB.settings.gWriteCal = (DB.gcals.find(c => c.primary && !c.readOnly) || DB.gcals.find(c => !c.readOnly) || {}).id || 'primary';
+    }
+    return DB.gcals;
+  },
+
+  /* ---------- event mapping ---------- */
+  toLocal(ev, calId) {
     const allDay = !!ev.start?.date;
     const startISO = ev.start?.dateTime || ev.start?.date;
     const endISO = ev.end?.dateTime || ev.end?.date;
-    const d = new Date(startISO);
     const hhmm = x => { const t = new Date(x); return pad(t.getHours()) + ':' + pad(t.getMinutes()); };
     return {
-      gid: ev.id, gUpdated: ev.updated,
+      gid: ev.id, gcal: calId, gUpdated: ev.updated,
       title: ev.summary || '(no title)',
-      date: allDay ? String(ev.start.date) : ymd(d),
+      date: allDay ? String(ev.start.date) : ymd(new Date(startISO)),
       start: allDay ? '' : hhmm(startISO),
       end: allDay || !ev.end?.dateTime ? '' : hhmm(endISO),
       allDay, loc: ev.location || '', notes: (ev.description || '').slice(0, 1500),
+      cal: 'gcal', dirty: false,
     };
   },
   toGoogle(e) {
@@ -2632,85 +3015,115 @@ const G = {
       body.end = { date: addDays(e.date, 1) };
     } else {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const end = e.end && e.end > e.start ? e.end : e.start;
       body.start = { dateTime: `${e.date}T${e.start}:00`, timeZone: tz };
-      body.end = { dateTime: `${e.date}T${e.end || e.start}:00`, timeZone: tz };
+      body.end = { dateTime: `${e.date}T${end}:00`, timeZone: tz };
     }
     return body;
   },
 
-  async syncCalendar(log = () => {}) {
-    const CAL = 'primary';
+  /* ---------- the calendar sync ---------- */
+  async syncCalendar(onProgress = () => {}) {
+    if (!DB.gcals || !DB.gcals.length) await this.fetchCalendars();
+    const cals = (DB.gcals || []).filter(c => c.sync !== false);
+    const writable = new Set(DB.gcals.filter(c => !c.readOnly).map(c => c.id));
     let pushed = 0, pulled = 0, removed = 0;
+    const failures = [];
+    const justPushed = new Set();   // never sweep away what we only just created
 
-    /* 1 — send local deletions */
-    for (const gid of (DB.gTrash || []).slice()) {
-      try { await this.api(`https://www.googleapis.com/calendar/v3/calendars/${CAL}/events/${gid}`, { method: 'DELETE' }); } catch (e) {}
-      DB.gTrash = DB.gTrash.filter(x => x !== gid);
+    /* 1 — local deletions go up first */
+    for (const t of (DB.gTrash || []).slice()) {
+      const cal = t.cal || DB.settings.gWriteCal || 'primary';
+      try { await this.api(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events/${encodeURIComponent(t.gid)}`, { method: 'DELETE' }); } catch (e) { if (e.message === 'NEEDS_SIGNIN') throw e; }
+      DB.gTrash = DB.gTrash.filter(x => x.gid !== t.gid);
     }
-    /* 2 — send local creates & edits */
+
+    /* 2 — local creates and edits */
     for (const e of DB.events.filter(x => x.dirty)) {
+      const cal = (e.gcal && writable.has(e.gcal)) ? e.gcal : (DB.settings.gWriteCal || 'primary');
       const body = this.toGoogle(e);
       try {
         if (e.gid) {
-          const r = await this.api(`https://www.googleapis.com/calendar/v3/calendars/${CAL}/events/${e.gid}`,
+          const r = await this.api(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events/${encodeURIComponent(e.gid)}`,
             { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           e.gUpdated = r.updated;
         } else {
-          const r = await this.api(`https://www.googleapis.com/calendar/v3/calendars/${CAL}/events`,
+          const r = await this.api(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-          e.gid = r.id; e.gUpdated = r.updated;
+          e.gid = r.id; e.gcal = cal; e.gUpdated = r.updated; e.cal = 'gcal';
         }
+        justPushed.add(e.gid);
         e.dirty = false; pushed++;
-      } catch (err) { log('push failed: ' + err.message); }
+      } catch (err) { if (err.message === 'NEEDS_SIGNIN') throw err; failures.push(err.message); }
     }
-    /* 3 — pull the window */
-    const timeMin = new Date(fromYmd(addDays(today(), -180))).toISOString();
-    const timeMax = new Date(fromYmd(addDays(today(), 365))).toISOString();
-    let pageToken = '', seen = new Set();
-    do {
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${CAL}/events?singleEvents=true&orderBy=startTime&maxResults=250`
-        + `&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
-        + (pageToken ? `&pageToken=${pageToken}` : '');
-      const r = await this.api(url);
-      (r.items || []).forEach(ev => {
-        if (ev.status === 'cancelled') return;
-        seen.add(ev.id);
-        const inc = this.toLocal(ev);
-        const local = DB.events.find(x => x.gid === ev.id);
-        if (!local) { DB.events.push({ id: uid(), cal: 'gcal', ...inc }); pulled++; }
-        else if (local.gUpdated !== inc.gUpdated) { Object.assign(local, inc); pulled++; }
-      });
-      pageToken = r.nextPageToken || '';
-    } while (pageToken);
 
-    /* 4 — anything that had a gid, sits in the window, and is gone remotely was deleted there */
+    /* 3 — pull every calendar you ticked */
     const lo = addDays(today(), -180), hi = addDays(today(), 365);
+    const timeMin = new Date(fromYmd(lo)).toISOString();
+    const timeMax = new Date(fromYmd(hi)).toISOString();
+    const seen = new Set();
+    const byGid = new Map(DB.events.filter(e => e.gid).map(e => [e.gid, e]));
+
+    for (let i = 0; i < cals.length; i++) {
+      const cal = cals[i];
+      onProgress(`${i + 1}/${cals.length} · ${cal.name}`);
+      let pageToken = '';
+      try {
+        do {
+          const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events`
+            + `?singleEvents=true&orderBy=startTime&maxResults=250`
+            + `&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
+            + (pageToken ? `&pageToken=${pageToken}` : '');
+          const r = await this.api(url);
+          (r.items || []).forEach(ev => {
+            if (ev.status === 'cancelled') return;
+            seen.add(ev.id);
+            const inc = this.toLocal(ev, cal.id);
+            const local = byGid.get(ev.id);
+            if (!local) { const n = { id: uid(), ...inc }; DB.events.push(n); byGid.set(ev.id, n); pulled++; }
+            else if (local.gUpdated !== inc.gUpdated || local.gcal !== cal.id) { Object.assign(local, inc); pulled++; }
+          });
+          pageToken = r.nextPageToken || '';
+        } while (pageToken);
+      } catch (err) {
+        if (err.message === 'NEEDS_SIGNIN' || String(err.message).startsWith('API_OFF')) throw err;
+        failures.push(`${cal.name}: ${err.message}`);
+      }
+    }
+
+    /* 4 — anything that came from a synced calendar, sits in the window,
+           and is no longer there was deleted on Google's side */
+    const syncedIds = new Set(cals.map(c => c.id));
     const before = DB.events.length;
-    DB.events = DB.events.filter(e => !(e.gid && !seen.has(e.gid) && e.date >= lo && e.date <= hi && !e.dirty));
+    DB.events = DB.events.filter(e =>
+      !(e.gid && syncedIds.has(e.gcal) && !seen.has(e.gid) && !justPushed.has(e.gid)
+        && e.date >= lo && e.date <= hi && !e.dirty));
     removed = before - DB.events.length;
 
-    return { pushed, pulled, removed };
+    return { pushed, pulled, removed, calendars: cals.length, failures };
   },
 
-  /* ---------- Drive (appDataFolder) — the whole dataset, synced ---------- */
+  /* ---------- Drive (appDataFolder) ---------- */
   FILE: 'orbit-data.json',
   async findFile() {
     const r = await this.api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)&q=${encodeURIComponent("name='" + this.FILE + "'")}`);
     return (r.files || [])[0] || null;
   },
   async readFile(id) {
-    const tok = await this.auth(false).catch(() => this.auth(true));
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, { headers: { Authorization: 'Bearer ' + tok } });
+    if (!this.connected) throw new Error('NEEDS_SIGNIN');
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, { headers: { Authorization: 'Bearer ' + this.token } });
+    if (r.status === 401) { this.token = null; this.forget(); throw new Error('NEEDS_SIGNIN'); }
     if (!r.ok) throw new Error('Could not read the backup in Drive.');
     return r.json();
   },
   async writeFile(id) {
-    const tok = await this.auth(false).catch(() => this.auth(true));
+    if (!this.connected) throw new Error('NEEDS_SIGNIN');
+    const tok = this.token;
     const payload = JSON.stringify(DB);
     if (id) {
       const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, {
         method: 'PATCH', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: payload });
-      if (!r.ok) throw new Error('Could not save to Drive.');
+      if (!r.ok) throw new Error(r.status === 401 ? 'NEEDS_SIGNIN' : 'Could not save to Drive.');
       return id;
     }
     const boundary = 'orbit' + uid();
@@ -2719,26 +3132,23 @@ const G = {
       + `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${payload}\r\n--${boundary}--`;
     const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
-    if (!r.ok) throw new Error('Could not create the file in Drive.');
+    if (!r.ok) throw new Error(r.status === 401 ? 'NEEDS_SIGNIN' : 'Could not create the file in Drive.');
     return (await r.json()).id;
   },
 
   async syncDrive() {
     const f = await this.findFile();
-    if (!f) { const id = await this.writeFile(null); DB.driveId = id; return { dir: 'up', first: true }; }
+    if (!f) { DB.driveId = await this.writeFile(null); return { dir: 'up', first: true }; }
     DB.driveId = f.id;
     let remote = null;
-    try { remote = await this.readFile(f.id); } catch (e) { remote = null; }
-    const rAt = remote?.savedAt || '';
-    const lAt = DB.savedAt || '';
-    if (remote && rAt > lAt) {
-      const backup = JSON.parse(JSON.stringify(DB));
+    try { remote = await this.readFile(f.id); } catch (e) { if (e.message === 'NEEDS_SIGNIN') throw e; remote = null; }
+    if (remote && (remote.savedAt || '') > (DB.savedAt || '')) {
+      const keepId = DB.settings.googleClientId;
       DB = Object.assign(DEFAULTS(), remote);
       DB.settings = Object.assign(DEFAULTS().settings, remote.settings || {});
-      DB.settings.googleClientId = backup.settings.googleClientId || DB.settings.googleClientId;
+      DB.settings.googleClientId = keepId || DB.settings.googleClientId;
       DB.driveId = f.id;
       Vault.save(JSON.stringify(DB));
-      window._orbitUndo = backup;
       return { dir: 'down' };
     }
     await this.writeFile(f.id);
@@ -2746,61 +3156,129 @@ const G = {
   },
 };
 
-/* ---------- the one entry point the UI calls ---------- */
-let gSyncing = false, gLast = '';
-async function googleSync({ silent = false } = {}) {
+/* ============================================================
+   The one entry point the UI calls
+   ============================================================ */
+let gSyncing = false, gNeedsSignin = false, gProgress = '';
+
+function gExplain(msg) {
+  const m = String(msg || '');
+  if (m === 'NEEDS_SIGNIN') return { short: 'Your Google session expired', fix: 'Sessions last about an hour. Click Sync now and approve once — after that it stays quiet for another hour.' };
+  if (m === 'POPUP_BLOCKED') return { short: 'Your browser blocked the Google window', fix: 'Click the blocked-popup icon in the address bar, choose "Always allow pop-ups from this site", then try again.' };
+  if (m === 'SCOPE_MISSING') return { short: 'Calendar or Drive permission was not granted', fix: 'Disconnect, then Connect again and tick EVERY checkbox on the Google permission screen.' };
+  if (m.startsWith('API_OFF:')) {
+    const pid = (m.match(/project (\d+)/) || [])[1] || '';
+    return {
+      short: 'A Google API is switched off for this project',
+      fix: 'Open these two links, press ENABLE on each, wait a minute, then sync again:',
+      links: pid ? [
+        `https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=${pid}`,
+        `https://console.cloud.google.com/apis/library/drive.googleapis.com?project=${pid}`
+      ] : []
+    };
+  }
+  if (/redirect_uri_mismatch|origin/i.test(m)) return { short: 'This address is not registered on your Client ID', fix: `Add ${location.origin} under "Authorised JavaScript origins", then reload.` };
+  if (/access_denied/i.test(m)) return { short: 'Google refused access', fix: 'Add your own email under OAuth consent screen → Audience → Test users.' };
+  return { short: m, fix: '' };
+}
+
+async function googleSync({ silent = false, fromClick = false } = {}) {
   if (gSyncing || !DB.settings.googleOn) return;
-  gSyncing = true; paintSyncBadge();
+
+  /* A popup may only open from a real click — never from a timer. */
+  if (!G.connected) {
+    if (!fromClick) { gNeedsSignin = true; paintSyncBadge(); return; }
+    try { await G.auth(); } catch (e) { showSyncError(e.message); return; }
+  }
+  gNeedsSignin = false;
+  gSyncing = true; gProgress = ''; paintSyncBadge();
+
   const notes = [];
+  let warn = [];
   try {
     if (!G.email) await G.whoami();
+    await G.fetchCalendars();
+
     if (DB.settings.gCal !== false) {
-      const r = await G.syncCalendar();
-      if (r.pushed || r.pulled || r.removed) notes.push(`calendar: ${r.pulled} in, ${r.pushed} out${r.removed ? ', ' + r.removed + ' removed' : ''}`);
+      const r = await G.syncCalendar(p => { gProgress = p; paintSyncBadge(); });
+      notes.push(`${r.pulled} event${r.pulled === 1 ? '' : 's'} in from ${r.calendars} calendar${r.calendars === 1 ? '' : 's'}`
+        + (r.pushed ? `, ${r.pushed} out` : '') + (r.removed ? `, ${r.removed} removed` : ''));
+      warn = r.failures || [];
     }
+
+    /* the pull changed local data — stamp it BEFORE Drive decides who wins,
+       otherwise Drive would overwrite what we just fetched */
+    save();
+
     if (DB.settings.gDrive !== false) {
-      DB.savedAt = DB.savedAt || new Date().toISOString();
       const r = await G.syncDrive();
-      notes.push(r.dir === 'down' ? 'pulled your data from Drive' : (r.first ? 'created your Drive backup' : 'data saved to Drive'));
+      notes.push(r.dir === 'down' ? 'pulled newer data from Drive' : (r.first ? 'Drive backup created' : 'saved to Drive'));
     }
-    gLast = new Date().toISOString();
-    DB.settings.gLast = gLast;
+
+    G.lastError = '';
+    DB.settings.gLast = new Date().toISOString();
     save(); refresh();
-    if (!silent) toast(notes.length ? 'Synced — ' + notes.join(' · ') : 'Already up to date', 'cloud');
+    if (!silent) {
+      toast('Synced — ' + notes.join(' · '), 'cloud');
+      if (warn.length) setTimeout(() => toast(`${warn.length} calendar(s) could not be read`, 'bolt'), 2400);
+    }
   } catch (e) {
-    if (!silent) toast('Sync failed: ' + e.message, 'x');
+    if (e.message === 'NEEDS_SIGNIN') gNeedsSignin = true;
     G.lastError = e.message;
-  } finally { gSyncing = false; paintSyncBadge(); }
+    if (!silent) showSyncError(e.message);
+  } finally { gSyncing = false; gProgress = ''; paintSyncBadge(); refresh(); }
+}
+
+function showSyncError(msg) {
+  const ex = gExplain(msg);
+  toast('Sync failed: ' + ex.short, 'x');
+  if (!ex.fix) return;
+  const body = h('div', {}, h('div', { text: ex.fix, style: { color: 'var(--text-2)', lineHeight: '1.7' } }));
+  (ex.links || []).forEach(u => body.append(h('div', { style: { marginTop: '10px' } },
+    h('a', { href: u, target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', fontSize: '12.5px', wordBreak: 'break-all' }, text: u }))));
+  body.append(h('div', { class: 'tiny', style: { marginTop: '14px' }, html: 'Google said:<br>' + esc(String(msg).replace(/^API_OFF:/, '')) }));
+  modal({
+    title: ex.short, bodyNode: body,
+    footNode: h('div', { style: { display: 'flex', gap: '8px' } },
+      h('button', { class: 'btn', text: 'Close', onclick: closeModal }),
+      h('button', { class: 'btn primary', text: 'Try again', onclick: () => { closeModal(); googleSync({ fromClick: true }); } }))
+  });
 }
 
 function paintSyncBadge() {
   const b = $('#mb-sync'); if (!b) return;
   const on = DB.settings.googleOn;
   b.style.display = on ? 'flex' : 'none';
-  b.innerHTML = icon(gSyncing ? 'reset' : 'cloud', 15);
-  b.style.color = gSyncing ? 'var(--accent)' : '';
-  b.title = gSyncing ? 'Syncing…' : (DB.settings.gLast ? 'Synced ' + new Date(DB.settings.gLast).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' — click to sync now' : 'Click to sync now');
+  if (!on) return;
+  b.innerHTML = icon(gSyncing ? 'reset' : 'cloud', 15) + (gSyncing && gProgress ? `<span class="tiny" style="margin-left:4px">${esc(gProgress)}</span>` : '');
+  b.style.color = gSyncing ? 'var(--accent)' : (gNeedsSignin || G.lastError ? 'var(--warn)' : '');
+  b.title = gSyncing ? 'Syncing… ' + gProgress
+    : gNeedsSignin ? 'Signed out of Google — click to sign in again'
+    : G.lastError ? 'Last sync failed — click for details'
+    : (DB.settings.gLast ? 'Synced ' + new Date(DB.settings.gLast).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' — click to sync now' : 'Click to sync now');
 }
 
 async function googleConnect() {
   try {
-    await G.auth(true);
+    await G.auth();
     await G.whoami();
     DB.settings.googleOn = true;
     if (DB.settings.gCal === undefined) DB.settings.gCal = true;
     if (DB.settings.gDrive === undefined) DB.settings.gDrive = true;
+    G.lastError = ''; gNeedsSignin = false;
     commit();
     toast('Connected as ' + (G.email || 'your Google account'), 'cloud');
-    await googleSync();
-  } catch (e) { toast(e.message, 'x'); }
+    await googleSync({ fromClick: true });
+  } catch (e) { showSyncError(e.message); }
 }
 
-/* auto-sync: on load, every 3 minutes, and when the tab is hidden */
 function startGoogleLoop() {
+  G.restore();
   if (!DB.settings.googleOn || !G.originOk || !G.clientId) { paintSyncBadge(); return; }
-  G.auth(false).then(async () => { await G.whoami(); googleSync({ silent: true }); }).catch(() => paintSyncBadge());
-  setInterval(() => { if (!document.hidden) googleSync({ silent: true }); }, 180000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) googleSync({ silent: true }); });
+  if (G.connected) googleSync({ silent: true }); else gNeedsSignin = true;
+  paintSyncBadge();
+  setInterval(() => { if (!document.hidden && G.connected) googleSync({ silent: true }); }, 180000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && G.connected) googleSync({ silent: true }); });
 }
 </script>
 <script>
@@ -2891,7 +3369,7 @@ function tickClock() {
 }
 $('#mb-search').innerHTML = icon('search', 15);
 $('#mb-search').onclick = openSpot;
-$('#mb-sync').onclick = () => googleSync();
+$('#mb-sync').onclick = () => googleSync({ fromClick: true });
 $('#mb-theme').onclick = () => { DB.settings.theme = DB.settings.theme === 'dark' ? 'light' : 'dark'; applySettings(); commit(); };
 $('#mb-clockwrap').onclick = () => openApp('calendar');
 
