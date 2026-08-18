@@ -341,6 +341,13 @@ label.fld > .lb{display:block;font-size:11.5px;font-weight:600;color:var(--muted
 .tbl td{padding:8px 10px;border-bottom:1px solid var(--border)}
 .tbl tr:hover td{background:var(--surface-2)}
 .tbl td.num,.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  .vision-editable{padding:10px 12px;border:1px solid transparent;border-radius:12px;transition:background .18s,border-color .18s,transform .18s}
+  .vision-editable:hover{background:rgba(255,255,255,.045);border-color:var(--border);transform:translateY(-1px)}
+  .ck .btn{opacity:.55;transition:opacity .16s,transform .16s}
+  .ck:hover .btn{opacity:1}
+  .trait{transition:transform .16s,box-shadow .16s}
+  .trait:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,0,0,.12)}
 </style>
 <style>
 /* Lora — embedded so the file works with no internet at all */
@@ -3615,6 +3622,70 @@ async function editPillar(p) {
   commit();
 }
 
+async function editMilestone(p, m) {
+  const isNew = !m || !m.id;
+  const out = await formModal(isNew ? 'New milestone' : 'Edit milestone', [
+    { k: 'text', label: 'What counts as reached?', required: true, placeholder: 'Something you could show someone' },
+    { k: 'date', label: 'By when', type: 'date' },
+  ], { text: '', date: '', ...(m || {}) }, {
+    ok: isNew ? 'Add milestone' : 'Save changes',
+    onDelete: isNew ? null : async () => {
+      if (await confirmModal('Delete milestone?', `"${m.text}" will be removed.`, 'Delete')) {
+        p.milestones = (p.milestones || []).filter(x => x.id !== m.id);
+        commit();
+      }
+    }
+  });
+  if (!out) return;
+  if (isNew) (p.milestones ||= []).push({ id: uid(), text: out.text, date: out.date || '', done: false });
+  else Object.assign(p.milestones.find(x => x.id === m.id), { text: out.text, date: out.date || '' });
+  commit();
+}
+
+async function editPillarLog(p, entry) {
+  const isNew = !entry || !entry.id;
+  const isHours = p.goalType === 'hours';
+  const out = await formModal(isNew ? `Log progress · ${p.name}` : 'Edit progress entry', [
+    { type: 'row', fields: [
+      { k: 'date', label: 'Date', type: 'date' },
+      { k: 'amount', label: isHours ? 'Hours' : `Amount${p.unit ? ' (' + p.unit + ')' : ''}`, type: 'number', step: 'any', required: true }] },
+    { k: 'note', label: 'What did you actually do?', type: 'textarea', rows: 3, placeholder: 'Optional, but useful later' },
+  ], { date: today(), amount: '', note: '', ...(entry || {}) }, {
+    ok: isNew ? 'Log it' : 'Save changes',
+    onDelete: isNew ? null : async () => {
+      if (await confirmModal('Delete progress entry?', 'This removes the logged progress, not the pillar itself.', 'Delete')) {
+        p.log = (p.log || []).filter(x => x.id !== entry.id);
+        commit();
+      }
+    }
+  });
+  if (!out) return;
+  const data = { date: out.date, amount: Number(out.amount) || 0, note: out.note || '' };
+  if (isNew) (p.log ||= []).push({ id: uid(), ...data });
+  else Object.assign(p.log.find(x => x.id === entry.id), data);
+  commit();
+  toast(isNew ? `+${out.amount}${isHours ? 'h' : ''} · ${p.name}` : 'Progress entry updated', 'check');
+}
+
+async function editVisionTrait(v, tr) {
+  const isNew = !tr || !tr.id;
+  const out = await formModal(isNew ? 'New trait' : 'Edit trait', [
+    { k: 'text', label: 'Trait', required: true, placeholder: 'e.g. disciplined, curious, decisive' }
+  ], { text: '', ...(tr || {}) }, {
+    ok: isNew ? 'Add trait' : 'Save changes',
+    onDelete: isNew ? null : async () => {
+      if (await confirmModal('Delete trait?', `"${tr.text}" will be removed.`, 'Delete')) {
+        v.traits = (v.traits || []).filter(x => x.id !== tr.id);
+        commit();
+      }
+    }
+  });
+  if (!out) return;
+  if (isNew) (v.traits ||= []).push({ id: uid(), text: out.text });
+  else Object.assign(v.traits.find(x => x.id === tr.id), { text: out.text });
+  commit();
+}
+
 async function logPillar(p) {
   const isHours = p.goalType === 'hours';
   const out = await formModal(`Log progress · ${p.name}`, [
@@ -3673,8 +3744,8 @@ function visionOverview(body, v, re, st) {
 
   /* ---- the hero ---- */
   const hero = h('div', { class: 'vision-hero' });
-  hero.append(h('div', { class: 'vision-motto',
-    text: v.motto ? '\u201c' + v.motto + '\u201d' : 'Write the line you want to live by.' }));
+  const motto = h('div', { class: 'vision-motto', title: 'Click to edit', style: { cursor: 'pointer' }, onclick: editVisionMeta, text: v.motto ? '\u201c' + v.motto + '\u201d' : 'Write the line you want to live by.' });
+  hero.append(motto);
 
   if (t25) {
     const nums = h('div', { class: 'vision-nums' });
@@ -3690,8 +3761,12 @@ function visionOverview(body, v, re, st) {
     hero.append(h('button', { class: 'btn sm', style: { marginTop: '16px' },
       html: `${icon('calendar', 13)} Add your birthday to start the countdown`, onclick: editVisionMeta }));
   }
-  if (v.statement) hero.append(h('hr', { class: 'hr' }),
-    h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '14.5px' }, text: v.statement }));
+  if (v.statement) {
+    const statement = h('div', { class: 'vision-editable', title: 'Click to edit your vision', style: { cursor: 'pointer' }, onclick: editVisionMeta });
+    statement.append(h('div', { style: { display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px', color: 'var(--muted)', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' } }, icon('edit', 11), h('span', { text: 'Click to edit vision' })));
+    statement.append(h('div', { style: { whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '14.5px' }, text: v.statement }));
+    hero.append(h('hr', { class: 'hr' }), statement);
+  }
   body.append(hero);
 
   /* ---- one square per week, birth to 25 ---- */
@@ -3725,13 +3800,9 @@ function visionOverview(body, v, re, st) {
   const chips = h('div', { style: { display: 'flex', gap: '9px', flexWrap: 'wrap' } });
   if (!v.traits.length) chips.append(h('div', { class: 'tiny', text: 'The handful of words you want people to use about you.' }));
   v.traits.forEach(tr => {
-    const c = h('button', { class: 'trait', title: 'Click to remove' });
-    c.innerHTML = `<i style="width:6px;height:6px;border-radius:99px;background:var(--plum)"></i>${esc(tr.text)}`;
-    c.onclick = async () => {
-      if (await confirmModal('Remove trait?', `"${tr.text}" will be removed.`, 'Remove')) {
-        v.traits = v.traits.filter(x => x.id !== tr.id); commit();
-      }
-    };
+    const c = h('button', { class: 'trait', title: 'Click to edit' });
+    c.innerHTML = `<i style="width:6px;height:6px;border-radius:99px;background:var(--plum)"></i>${esc(tr.text)} <span style="opacity:.55;margin-left:4px">${icon('edit', 10)}</span>`;
+    c.onclick = () => editVisionTrait(v, tr);
     chips.append(c);
   });
   const ti = h('input', { class: 'inp', placeholder: 'Add a trait and press Enter', style: { marginTop: '12px' } });
@@ -3835,15 +3906,15 @@ function pillarDetail(body, p, re, st) {
     row.append(cb, h('div', { style: { flex: '1', minWidth: 0 } },
       h('div', { class: 'cktext', text: m.text, style: { fontSize: '13px' } }),
       m.date ? h('div', { class: 'tiny', text: m.done ? `reached ${fmtDate(m.doneOn || m.date)}` : `by ${fmtDate(m.date)}` }) : null),
-      h('button', { class: 'btn ghost sm', html: icon('x', 12), onclick: () => { p.milestones = p.milestones.filter(x => x.id !== m.id); commit(); } }));
+      h('button', { class: 'btn ghost sm', html: icon('edit', 12), title: 'Edit milestone', onclick: () => editMilestone(p, m) }),
+      h('button', { class: 'btn ghost sm', html: icon('x', 12), title: 'Delete milestone', onclick: async () => {
+        if (await confirmModal('Delete milestone?', `"${m.text}" will be removed.`, 'Delete')) {
+          p.milestones = p.milestones.filter(x => x.id !== m.id); commit();
+        }
+      } }));
     mc.append(row);
   });
-  const mAdd = h('button', { class: 'btn sm', style: { marginTop: '10px' }, html: `${icon('plus', 13)} Milestone`, onclick: async () => {
-    const o = await formModal('New milestone', [
-      { k: 'text', label: 'What counts as reached?', required: true, placeholder: 'Something you could show someone' },
-      { k: 'date', label: 'By when', type: 'date' }], {}, { ok: 'Add' });
-    if (o) { (p.milestones ||= []).push({ id: uid(), text: o.text, date: o.date, done: false }); commit(); }
-  } });
+  const mAdd = h('button', { class: 'btn sm', style: { marginTop: '10px' }, html: `${icon('plus', 13)} Milestone`, onclick: () => editMilestone(p, {}) });
   mc.append(mAdd);
   cols.append(mc);
 
@@ -3859,7 +3930,14 @@ function pillarDetail(body, p, re, st) {
     row.innerHTML = `<span class="tiny mono" style="flex:0 0 62px">${esc(fmtDate(x.date, { month: 'short', day: 'numeric' }))}</span>
       <span class="mono" style="font-weight:600;flex:0 0 auto">${esc(String(x.amount))}${esc(unit ? ' ' + unit : '')}</span>
       <span class="tiny" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.note || '')}</span>`;
-    row.append(h('button', { class: 'btn ghost sm', html: icon('x', 11), onclick: () => { p.log = p.log.filter(y => y.id !== x.id); commit(); } }));
+    row.append(
+      h('button', { class: 'btn ghost sm', html: icon('edit', 11), title: 'Edit entry', onclick: () => editPillarLog(p, x) }),
+      h('button', { class: 'btn ghost sm', html: icon('x', 11), title: 'Delete entry', onclick: async () => {
+        if (await confirmModal('Delete progress entry?', 'This removes the logged progress, not the pillar itself.', 'Delete')) {
+          p.log = p.log.filter(y => y.id !== x.id); commit();
+        }
+      } })
+    );
     lc.append(row);
   });
   if (entries.length > 40) lc.append(h('div', { class: 'tiny', style: { marginTop: '8px' }, text: `showing the last 40 of ${entries.length}` }));
