@@ -702,6 +702,8 @@ const Vault = (() => {
   };
 })();
 
+const BUILD = '2026-08-18 · 4';
+
 const DEFAULTS = () => ({
   version: 1,
   settings: {
@@ -4307,7 +4309,7 @@ const AppSettings = {
     body.append(sec('Your data', dataRow, storeNote));
 
     const counts = h('div', { class: 'tiny', html:
-      `${DB.events.length} events · ${DB.tasks.length} tasks · ${DB.notes.length} notes · ${DB.journal.length} journal entries · ${DB.habits.length} habits · ${DB.txns.length} transactions · ${DB.trips.length} trips · ${DB.sessions.length} focus sessions` });
+      `${DB.events.length} events · ${DB.tasks.length} tasks · ${DB.notes.length} notes · ${DB.journal.length} journal entries · ${DB.habits.length} habits · ${DB.txns.length} transactions · ${DB.trips.length} trips · ${DB.courses.length} courses · ${DB.goals.length} goals · ${DB.sessions.length} focus sessions<br><span style="opacity:.7">Build ${esc(BUILD)}</span>` });
     body.append(sec('In here right now', counts));
 
     body.append(h('div', { class: 'tiny', style: { textAlign: 'center', padding: '10px' }, html: 'Orbit · one HTML file · works offline · <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> to search' }));
