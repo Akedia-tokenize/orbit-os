@@ -4579,14 +4579,26 @@ const G = {
     return (await r.json()).id;
   },
 
-  async syncDrive() {
+  async syncDrive(force) {
     const f = await this.findFile();
     if (!f) { DB.driveId = await this.writeFile(null); return { dir: 'up', first: true }; }
     DB.driveId = f.id;
     let remote = null;
     try { remote = await this.readFile(f.id); } catch (e) { if (e.message === 'NEEDS_SIGNIN') throw e; remote = null; }
-    if (remote && (remote.savedAt || '') > (DB.savedAt || '')) {
+
+    /* ---- guards, so a blank or half-loaded copy can never wipe Drive ---- */
+    const mine = dbSize(DB), theirs = dbSize(remote);
+    const newer = remote && (remote.savedAt || '') > (DB.savedAt || '');
+    /* this browser has (almost) nothing and Drive has plenty: always take Drive */
+    const takeTheirs = remote && theirs > 0 && (mine === 0 || newer);
+    /* this browser lost a lot compared with Drive: hold, do not upload over it */
+    const suspicious = remote && theirs >= 8 && mine < theirs * 0.5;
+
+    if (!takeTheirs && suspicious && !force) return { dir: 'hold', mine, theirs };
+
+    if (takeTheirs) {
       const keepId = DB.settings.googleClientId;
+      try { localStorage.setItem('orbit.os.v1.prev', JSON.stringify(DB)); } catch (e) {}
       DB = Object.assign(DEFAULTS(), remote);
       migrate();
       DB.settings = Object.assign(DEFAULTS().settings, remote.settings || {});
@@ -4599,6 +4611,40 @@ const G = {
     return { dir: 'up' };
   },
 };
+
+/* how much is actually in a database — used to refuse dangerous overwrites */
+function dbSize(p) {
+  if (!p || typeof p !== 'object') return 0;
+  return ['events', 'tasks', 'notes', 'habits', 'txns', 'trips', 'courses', 'wishlist', 'goals', 'projects', 'journal']
+    .reduce((a, k) => a + ((p[k] || []).length), 0) + (((p.vision || {}).pillars || []).length);
+}
+
+/* Drive holds more than this browser: never silently push the smaller one */
+async function driveHoldWarning(r) {
+  toast('Drive has more data than this browser — nothing was overwritten', 'bolt');
+  const ok = await confirmModal('Drive has more than this copy',
+    `Google Drive holds ${r.theirs} items, this browser has ${r.mine}. Orbit did not upload, so nothing in Drive was lost.\n\nPull the Drive copy down into this browser?`,
+    'Pull from Drive');
+  if (!ok) {
+    DB.settings.forceUp = true; save();
+    toast('Fine — press Sync now once more and this browser will overwrite Drive', 'cloud');
+    return;
+  }
+  try {
+    const f = await G.findFile();
+    const remote = await G.readFile(f.id);
+    const keepId = DB.settings.googleClientId;
+    try { localStorage.setItem('orbit.os.v1.prev', JSON.stringify(DB)); } catch (e) {}
+    DB = Object.assign(DEFAULTS(), remote);
+    migrate();
+    DB.settings = Object.assign(DEFAULTS().settings, remote.settings || {});
+    DB.settings.googleClientId = keepId || DB.settings.googleClientId;
+    DB.driveId = f.id;
+    Vault.save(JSON.stringify(DB));
+    applySettings(); refresh();
+    toast('Pulled your data down from Drive', 'download');
+  } catch (e) { showSyncError(e.message); }
+}
 
 /* ============================================================
    The one entry point the UI calls
@@ -4655,8 +4701,14 @@ async function googleSync({ silent = false, fromClick = false } = {}) {
     save();
 
     if (DB.settings.gDrive !== false) {
-      const r = await G.syncDrive();
-      notes.push(r.dir === 'down' ? 'pulled newer data from Drive' : (r.first ? 'Drive backup created' : 'saved to Drive'));
+      const r = await G.syncDrive(fromClick && DB.settings.forceUp);
+      if (r.dir === 'hold') {
+        notes.push('Drive left untouched');
+        driveHoldWarning(r);
+      } else {
+        if (DB.settings.forceUp) { DB.settings.forceUp = false; }
+        notes.push(r.dir === 'down' ? 'pulled newer data from Drive' : (r.first ? 'Drive backup created' : 'saved to Drive'));
+      }
     }
 
     G.lastError = '';
