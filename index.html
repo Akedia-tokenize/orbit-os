@@ -41,6 +41,13 @@
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
   --ord1:#9ec5f4; --ord2:#6da7ec; --ord3:#3987e5; --ord4:#256abf; --ord5:#184f95;
+  /* 20 picker colours — for accents, projects and labels */
+  --c1:#e74c5e; --c2:#e8634a; --c3:#e8a33a; --c4:#e8c83a;
+  --c5:#5cb85c; --c6:#2ecc71; --c7:#1abc9c; --c8:#3498db;
+  --c9:#3b82f6; --c10:#6366f1; --c11:#8b5cf6; --c12:#a855f7;
+  --c13:#d946ef; --c14:#ec4899; --c15:#f472b6; --c16:#fb7185;
+  --c17:#f97316; --c18:#f59e0b; --c19:#10b981; --c20:#06b6d4;
+  --shadow-glass:0 8px 32px rgba(0,0,0,.30);
   --shadow-win:0 1px 2px rgba(0,0,0,.45), 0 18px 50px -12px rgba(10,2,14,.8);
   --shadow-pop:0 12px 40px -8px rgba(10,2,14,.65);
   --r-win:14px; --r-md:10px; --r-sm:7px;
@@ -70,6 +77,7 @@ html[data-theme="light"]{
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
   --ord1:#86b6ef; --ord2:#5598e7; --ord3:#2a78d6; --ord4:#1c5cab; --ord5:#104281;
+  --shadow-glass:0 8px 32px rgba(60,26,52,.15);
   --shadow-win:0 1px 2px rgba(60,26,52,.10), 0 18px 44px -14px rgba(60,26,52,.28);
   --shadow-pop:0 12px 36px -10px rgba(60,26,52,.24);
 }
@@ -424,7 +432,33 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
 .pomo-mode button.on{background:var(--accent);color:#fff}
 
 /* ---------- finance / charts ---------- */
-.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 15px}
+.stat{
+  position:relative; overflow:hidden;
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border); border-radius:var(--r-md); padding:13px 15px;
+  transition:transform .2s cubic-bezier(.2,.8,.3,1), box-shadow .2s, border-color .2s;
+}
+.stat::before{
+  content:""; position:absolute; inset:0 auto auto 0; width:100%; height:2px;
+  background:linear-gradient(90deg,var(--accent),transparent 70%); opacity:.6;
+}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-glass);border-color:var(--border-strong)}
+.card.glass{
+  background:var(--glass); backdrop-filter:blur(12px) saturate(140%);
+  -webkit-backdrop-filter:blur(12px) saturate(140%);
+  border:1px solid var(--border-strong); box-shadow:var(--shadow-glass);
+}
+.card.glass:hover{box-shadow:var(--shadow-pop)}
+.color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px;padding:4px 0}
+.color-opt{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r-sm);
+  border:1.5px solid var(--border);background:var(--surface);transition:all .15s;font-size:12px;
+}
+.color-opt:hover{border-color:var(--border-strong);background:var(--surface-2);transform:translateY(-1px)}
+.color-opt.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.color-opt .swatch{width:22px;height:22px;border-radius:50%;flex:0 0 auto;border:2px solid var(--border-strong);transition:transform .2s}
+.color-opt:hover .swatch{transform:scale(1.12)}
+.color-opt .cname{font-size:11.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stat .k{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .stat .v{font-size:25px;font-weight:600;letter-spacing:-.02em;margin-top:5px;font-variant-numeric:tabular-nums}
 .stat .d{font-size:11.5px;color:var(--muted);margin-top:2px}
@@ -501,13 +535,21 @@ html[data-theme="light"] .vision-hero::before{opacity:.20}
   font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
 }
 .pillar-card{
-  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);
+  background:linear-gradient(155deg,color-mix(in srgb,var(--pc) 12%,var(--surface-2)),var(--surface-2) 60%);
+  border:1px solid var(--border);border-radius:var(--r-md);
   padding:16px;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s;
   display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;
 }
 .pillar-card::after{
   content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--pc);
+  box-shadow:0 0 18px 1px var(--pc);
 }
+.pillar-card::before{
+  content:"";position:absolute;top:-40%;right:-20%;width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle,var(--pc),transparent 70%);opacity:.16;pointer-events:none;
+  transition:opacity .25s,transform .35s;
+}
+.pillar-card:hover::before{opacity:.3;transform:scale(1.15)}
 .pillar-card:hover{transform:translateY(-3px);border-color:var(--border-strong);box-shadow:var(--shadow-pop)}
 
 /* ---------- responsive / mobile ---------- */
@@ -702,7 +744,7 @@ const Vault = (() => {
   };
 })();
 
-const BUILD = '2026-08-18 · 4';
+const BUILD = '2026-08-18 · 5';
 
 const DEFAULTS = () => ({
   version: 1,
@@ -3465,7 +3507,7 @@ function visionOverview(body, v, re, st) {
   }
 
   /* ---- traits ---- */
-  const tc = h('div', { class: 'card', style: { marginTop: '14px' } });
+  const tc = h('div', { class: 'card glass', style: { marginTop: '14px' } });
   tc.append(h('h3', { text: 'The traits he is known for' }));
   const chips = h('div', { style: { display: 'flex', gap: '9px', flexWrap: 'wrap' } });
   if (!v.traits.length) chips.append(h('div', { class: 'tiny', text: 'The handful of words you want people to use about you.' }));
@@ -3492,7 +3534,7 @@ function visionOverview(body, v, re, st) {
     const need = hourly.reduce((a, p) => a + Math.max(0, p.target - pillarLogged(p)), 0) / weeksLeft;
     const did = hourly.reduce((a, p) => a + (p.log || []).filter(x => x.date >= weekStart).reduce((b, x) => b + (+x.amount || 0), 0), 0);
     const pct = need > 0 ? Math.min(100, did / need * 100) : 100;
-    const c = h('div', { class: 'card', style: { marginTop: '14px', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' } });
+    const c = h('div', { class: 'card glass', style: { marginTop: '14px', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' } });
     c.append(ring(pct, pct >= 100 ? 'var(--good)' : 'var(--accent)', Math.round(pct) + '%', 70));
     c.append(h('div', { style: { flex: '1', minWidth: '200px' } },
       h('div', { style: { fontSize: '15px', fontWeight: 700 },
@@ -3905,7 +3947,7 @@ function goalColumn(scope, st, re) {
   const done = list.filter(g => g.done).length;
   const pct = list.length ? Math.round(done / list.length * 100) : 0;
 
-  const card = h('div', { class: 'card', style: { display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '260px' } });
+  const card = h('div', { class: 'card glass', style: { display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '260px' } });
   const head = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
   head.append(h('h3', { text: s.label, style: { margin: 0, fontSize: '14px', fontWeight: 700, color: s.c } }), h('div', { class: 'spacer' }),
     h('button', { class: 'btn ghost sm', html: icon('left', 13), onclick: () => { st.off[scope]--; re(); }, title: 'Earlier' }),
@@ -4117,6 +4159,10 @@ const WALLS = [['aurora', 'Aurora'], ['mesh', 'Mesh'], ['plain', 'Plain']];
 const ACCENTS = [
   ['#c9265a', 'Raspberry'], ['#7b3f92', 'Aubergine'], ['#8e2f4f', 'Wine'],
   ['#b5561c', 'Terracotta'], ['#2e7d63', 'Fern'], ['#4a5fa5', 'Indigo'],
+  ['#e74c5e', 'Coral'], ['#e8a33a', 'Amber'], ['#2ecc71', 'Mint'],
+  ['#1abc9c', 'Teal'], ['#3498db', 'Sky'], ['#6366f1', 'Iris'],
+  ['#8b5cf6', 'Violet'], ['#d946ef', 'Orchid'], ['#ec4899', 'Fuchsia'],
+  ['#fb7185', 'Rose'], ['#f97316', 'Ember'], ['#06b6d4', 'Lagoon'],
 ];
 
 function applySettings() {
@@ -4153,10 +4199,11 @@ const AppSettings = {
 
     const themeSeg = h('div', { class: 'seg' });
     [['dark', 'Dark'], ['light', 'Light']].forEach(([k, l]) => themeSeg.append(h('button', { class: s.theme === k ? 'on' : '', text: l, onclick: () => { s.theme = k; applySettings(); commit(); } })));
-    const accRow = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    const accRow = h('div', { class: 'color-grid' });
     ACCENTS.forEach(([c, nm]) => accRow.append(h('button', {
-      style: { width: '30px', height: '30px', borderRadius: '99px', background: c, border: s.accent === c ? '2.5px solid var(--text)' : '1px solid var(--border)' },
-      title: nm, onclick: () => { s.accent = c; applySettings(); commit(); }
+      class: 'color-opt' + (s.accent === c ? ' active' : ''), title: nm,
+      html: `<i class="swatch" style="background:${c}"></i><span class="cname">${esc(nm)}</span>`,
+      onclick: () => { s.accent = c; applySettings(); commit(); }
     })));
     const wallSeg = h('div', { class: 'seg' });
     WALLS.forEach(([k, l]) => wallSeg.append(h('button', { class: s.wall === k ? 'on' : '', text: l, onclick: () => { s.wall = k; applySettings(); commit(); } })));
