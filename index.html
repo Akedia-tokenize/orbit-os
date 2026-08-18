@@ -42,11 +42,11 @@
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
   --ord1:#9ec5f4; --ord2:#6da7ec; --ord3:#3987e5; --ord4:#256abf; --ord5:#184f95;
   /* 20 picker colours — for accents, projects and labels */
-  --c1:#e74c5e; --c2:#e8634a; --c3:#e8a33a; --c4:#e8c83a;
-  --c5:#5cb85c; --c6:#2ecc71; --c7:#1abc9c; --c8:#3498db;
-  --c9:#3b82f6; --c10:#6366f1; --c11:#8b5cf6; --c12:#a855f7;
-  --c13:#d946ef; --c14:#ec4899; --c15:#f472b6; --c16:#fb7185;
-  --c17:#f97316; --c18:#f59e0b; --c19:#10b981; --c20:#06b6d4;
+  --c1:#ff5c8a; --c2:#ff7657; --c3:#ffc857; --c4:#f4e35e;
+  --c5:#7ddf7d; --c6:#36d399; --c7:#2dd4bf; --c8:#4cc9f0;
+  --c9:#3b82f6; --c10:#6366f1; --c11:#8b5cf6; --c12:#a78bfa;
+  --c13:#d946ef; --c14:#f472b6; --c15:#fb7185; --c16:#ff6b9a;
+  --c17:#ff8a3d; --c18:#fbbf24; --c19:#22c55e; --c20:#06b6d4;
   --shadow-glass:0 8px 32px rgba(0,0,0,.30);
   --shadow-win:0 1px 2px rgba(0,0,0,.45), 0 18px 50px -12px rgba(10,2,14,.8);
   --shadow-pop:0 12px 40px -8px rgba(10,2,14,.65);
@@ -527,6 +527,23 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
 @media(max-width:700px){
   .home-hero{padding:20px;min-height:155px}.home-orb{width:86px;height:86px;flex-basis:86px}.home-orb i{width:48px;height:48px}.home-title{font-size:25px}.home-note{display:none}.home-live{font-size:20px}
 }
+/* ---------- goal system ---------- */
+.goal-kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin:0 0 14px}
+.goal-kpi-mini{padding:10px 11px;border:1px solid var(--border);background:linear-gradient(135deg,var(--surface-2),var(--surface));border-radius:11px;box-shadow:0 8px 22px rgba(0,0,0,.08)}
+.goal-kpi-top{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700}.goal-kpi-top span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.goal-kpi-top strong{color:var(--accent)}
+.goal-kpi-bar,.body-target-bar{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:7px}.goal-kpi-bar i,.body-target-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--c13));transition:width .25s}.body-target-bar.pink i{background:linear-gradient(90deg,var(--c1),var(--c14))}
+/* ---------- body tracker ---------- */
+.body-dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.body-stat{position:relative;overflow:hidden;padding:16px 15px 15px 54px;min-height:118px;border:1px solid var(--border);border-radius:15px;background:linear-gradient(145deg,var(--surface-2),var(--surface));box-shadow:0 10px 30px rgba(0,0,0,.09)}
+.body-stat::after{content:"";position:absolute;width:90px;height:90px;right:-30px;top:-35px;border-radius:50%;background:var(--body-accent,var(--accent));opacity:.12;filter:blur(2px)}
+.body-stat-icon{position:absolute;left:14px;top:15px;width:29px;height:29px;border-radius:10px;display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,var(--body-accent,var(--accent)),color-mix(in srgb,var(--body-accent,var(--accent)) 55%,#120914));box-shadow:0 8px 18px rgba(0,0,0,.18)}
+.body-stat.weight{--body-accent:var(--c13)}.body-stat.protein{--body-accent:var(--c7)}.body-stat.measure{--body-accent:var(--c3)}
+.body-stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}.body-stat .v{font-size:28px;line-height:1.1;font-weight:700;margin-top:5px}.body-stat .v span{font-size:12px;color:var(--muted);margin-left:4px;font-weight:600}.body-stat .d{font-size:11px;color:var(--text-2);margin-top:6px}
+.body-targets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:12px}.body-target-card{padding:12px 14px;border-radius:13px;background:linear-gradient(135deg,rgba(139,92,246,.10),rgba(255,92,138,.06));border:1px solid var(--border)}.body-target-head{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700}.body-target-head strong{font-variant-numeric:tabular-nums}
+.body-chart{min-height:150px}.body-chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.body-chart-head h3{margin:0}.body-spark{height:86px;display:flex;align-items:flex-end;gap:5px;padding:6px 2px}.body-bar{flex:1;min-width:5px;max-width:18px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,var(--accent),var(--plum));opacity:.82;transition:transform .15s}.body-bar:hover{transform:translateY(-3px);opacity:1}
+.measure-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.measure-card{padding:11px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2)}.measure-name{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.measure-v{font-size:22px;font-weight:700;margin-top:4px}.measure-v span{font-size:10px;color:var(--muted);margin-left:3px}.measure-d{font-size:10.5px;margin-top:4px;color:var(--muted)}.measure-d.good{color:var(--good)}
+.body-history{display:flex;flex-direction:column;gap:5px}.body-history-row{display:grid;grid-template-columns:1.2fr .8fr 1fr 1fr;gap:8px;align-items:center;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:var(--surface-2);text-align:left;font-size:11.5px}.body-history-row:hover{border-color:var(--border-strong);background:var(--surface-3)}.body-history-row strong{font-variant-numeric:tabular-nums}.body-empty{display:flex;align-items:center;gap:14px;margin-bottom:12px;background:linear-gradient(135deg,rgba(255,92,138,.10),rgba(139,92,246,.10));border-color:var(--border-strong)}.body-empty-orb{width:52px;height:52px;border-radius:18px;display:grid;place-items:center;color:#fff;background:conic-gradient(from 20deg,var(--c14),var(--c11),var(--c7),var(--c3),var(--c14));box-shadow:0 10px 28px rgba(0,0,0,.18)}
+@media(max-width:760px){.body-dashboard,.body-targets{grid-template-columns:1fr}.measure-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.body-history-row{grid-template-columns:1fr 1fr}.body-history-row span:nth-child(n+3){display:none}}
 /* ---------- finance / charts ---------- */
 .stat{
   position:relative; overflow:hidden;
@@ -840,6 +857,7 @@ const ICONS = {
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5.2-5.2 2 2-5.2Z"/>',
   cap: '<path d="M2.5 8.5 12 4l9.5 4.5L12 13Z"/><path d="M6.5 10.6V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-5.4"/><path d="M21 8.8V14"/>',
   heart: '<path d="M12 20.5S3.5 15.4 3.5 9.6A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8.5 2.6c0 5.8-8.5 10.9-8.5 10.9Z"/>',
+  activity: '<path d="M3 12h4l2.2-6 4.2 12 2.2-6H21"/>',
   link: '<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.3 1.3"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.3-1.3"/>',
   google: '<path d="M20.6 12.2c0-.6-.05-1.2-.15-1.7H12v3.4h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6Z"/><path d="M12 21c2.4 0 4.5-.8 6-2.2l-2.9-2.2a5.4 5.4 0 0 1-8-2.8H4.1v2.3A9 9 0 0 0 12 21Z"/><path d="M7.1 13.8a5.4 5.4 0 0 1 0-3.4V8.1H4.1a9 9 0 0 0 0 8.1Z"/><path d="M12 6.6c1.3 0 2.5.45 3.4 1.35l2.6-2.6A9 9 0 0 0 4.1 8.1l3 2.3A5.4 5.4 0 0 1 12 6.6Z"/>',
 };
@@ -860,12 +878,12 @@ const Vault = (() => {
   };
 })();
 
-const BUILD = '2026-08-18 · 8';
+const BUILD = '2026-08-18 · 9';
 
 const DEFAULTS = () => ({
   version: 1,
   settings: {
-    osName: 'Orbit', user: '', theme: 'dark', accent: '#c9265a', wall: 'aurora',
+    osName: 'Orbit', user: '', theme: 'dark', accent: '#ff5c8a', wall: 'aurora',
     currency: '$', weekStart: 0, pomo: { focus: 25, short: 5, long: 15 },
     googleClientId: '', googleOn: false, gCal: true, gDrive: true, gLast: '',
     gWriteCal: '', hiddenCals: []
@@ -873,7 +891,7 @@ const DEFAULTS = () => ({
   events: [], tasks: [], projects: [], notes: [], journal: [], habits: [],
   sessions: [], txns: [], budgets: {}, trips: [],
   gTrash: [], gcals: [], cats: [], incomeCats: [], catPalette: {}, driveId: '', savedAt: '',
-  courses: [], wishlist: [], goals: [],
+  courses: [], wishlist: [], goals: [], bodyTracker: { proteinTarget: '', weightTarget: '', entries: [] },
   vision: { motto: '', statement: '', birthday: '', traits: [], pillars: [] }
 });
 
@@ -921,6 +939,8 @@ function loadDB() {
 /* runs after every route that replaces DB: local load, Drive restore, backup import */
 function migrate() {
   DB.goals ||= [];
+  DB.bodyTracker ||= { proteinTarget: '', weightTarget: '', entries: [] };
+  DB.bodyTracker.entries ||= [];
   DB.cats = (DB.cats || []).filter(c => c !== 'Investment');
   /* old "Investment" expenses become real investments on the Budgets tab */
   (DB.txns || []).forEach(t => {
@@ -4130,6 +4150,17 @@ function periodLabel(scope, key) {
 }
 const goalsIn = (scope, key) => DB.goals.filter(g => g.scope === scope && g.period === key);
 
+const GOAL_MEASURES = [
+  ['time','Time / hours'], ['milestone','Milestones'], ['output','Output / deliverables'],
+  ['numeric','Numeric result'], ['kpi','KPI / percentage'], ['binary','Binary outcome'], ['consistency','Consistency / frequency']
+];
+function goalKpiPct(g){
+  const a=Number(g.kpiCurrent), b=Number(g.kpiTarget);
+  if(!Number.isFinite(a)||!Number.isFinite(b)||b<=0) return null;
+  return clamp(Math.round(a/b*100),0,100);
+}
+function goalMilestones(g){ return String(g.milestones||'').split('\n').map(x=>x.trim()).filter(Boolean); }
+
 async function editGoal(g, scope, key) {
   const isNew = !g.id;
   ensureTaskCategories();
@@ -4144,19 +4175,28 @@ async function editGoal(g, scope, key) {
     { type: 'row', fields: [
       { k: 'scope', label: 'Horizon', type: 'select', options: SCOPES.map(s => [s.k, s.label]) },
       { k: 'period', label: 'Planning period', hint: 'Used for weekly/monthly/yearly views.' }] },
+    { k: 'measurement', label: 'How is success measured?', type: 'select', options: GOAL_MEASURES },
+    { type: 'row', fields: [
+      { k: 'kpiName', label: 'KPI name', placeholder: 'e.g. Focus hours, qualified leads, pages shipped' },
+      { k: 'kpiUnit', label: 'Unit', placeholder: 'hours, %, leads, outputs…' }] },
+    { type: 'row', fields: [
+      { k: 'kpiCurrent', label: 'Current value', type: 'number', min: 0, step: 'any' },
+      { k: 'kpiTarget', label: 'Target value', type: 'number', min: 0, step: 'any' }] },
     { type: 'row', fields: [
       { k: 'priority', label: 'Priority', type: 'select', options: PRI.map(p => [p.v, p.name]) },
-      { k: 'target', label: 'Target / metric', placeholder: 'e.g. 120g, 10 calls, €5,000' }] },
+      { k: 'reviewDate', label: 'Review date', type: 'date' }] },
+    { k: 'milestones', label: 'Milestones', type: 'textarea', rows: 4, placeholder: 'One milestone per line. Example:\nResearch complete\nPrototype complete\nFirst user test' },
+    { k: 'successCriteria', label: 'Definition of done', type: 'textarea', rows: 3, placeholder: 'What evidence would convince you this goal is actually achieved?' },
+    { k: 'nextAction', label: 'Next action', placeholder: 'The smallest concrete action that moves this forward' },
+    { k: 'blocker', label: 'Current blocker / risk', placeholder: 'Optional. Name the constraint, not a vague feeling.' },
     { k: 'why', label: 'Why this one', type: 'textarea', rows: 2, placeholder: 'Why does this matter?' },
   ], {
-    scope: chosenScope,
-    period: chosenKey,
-    startDate: g.startDate || today(),
+    scope: chosenScope, period: chosenKey, startDate: g.startDate || today(),
     deadline: g.deadline || goalDefaultDeadline(chosenScope, chosenKey),
-    priority: g.priority ?? 0,
-    categoryId: g.categoryId || '',
-    target: g.target || '',
-    ...g
+    priority: g.priority ?? 0, categoryId: g.categoryId || '', measurement: g.measurement || 'output',
+    kpiName: g.kpiName || '', kpiUnit: g.kpiUnit || '', kpiCurrent: g.kpiCurrent ?? '', kpiTarget: g.kpiTarget ?? '',
+    reviewDate: g.reviewDate || '', milestones: g.milestones || '', successCriteria: g.successCriteria || '',
+    nextAction: g.nextAction || '', blocker: g.blocker || '', ...g
   }, {
     onDelete: isNew ? null : async () => { DB.goals = DB.goals.filter(x => x.id !== g.id); commit(); toast('Goal deleted', 'trash'); }
   });
@@ -4202,8 +4242,11 @@ function goalColumn(scope, st, re) {
       gm.append(h('span', { class: 'chip', html: `<i class="dot" style="background:${gp?.color || 'var(--accent)'}"></i>${esc(gc)}` }));
     }
     gm.append(h('span', { class: 'due ' + (g.done ? '' : (goalDeadline(g) < today() ? 'over' : '')), text: goalDeadlineText(g) }));
-    if (g.target) gm.append(h('span', { class: 'tiny', text: 'Target: ' + g.target }));
-    if (g.priority) gm.append(h('span', { class: 'pri', style: { background: PRI[g.priority].c }, title: PRI[g.priority].name }));
+    if (g.measurement) gm.append(h('span', { class: 'chip', text: GOAL_MEASURES.find(x=>x[0]===g.measurement)?.[1] || g.measurement }));
+    const kp = goalKpiPct(g);
+    if (kp != null) gm.append(h('span', { class: 'tiny', text: `${g.kpiName || 'KPI'} ${kp}%` }));
+    else if (g.kpiTarget != null && g.kpiTarget !== '') gm.append(h('span', { class: 'tiny', text: `Target: ${g.kpiTarget}${g.kpiUnit ? ' '+g.kpiUnit : ''}` }));
+    if (g.priority) gm.append(h('i', { class: 'pri', style: { background: PRI[g.priority].c }, title: PRI[g.priority].name }));
     if (g.why) gm.append(h('span', { class: 'tiny', text: g.why }));
     if (gm.children.length) mid.append(gm);
     row.append(cb, mid);
@@ -4215,7 +4258,7 @@ function goalColumn(scope, st, re) {
   const inp = h('input', { class: 'inp', placeholder: 'Add a goal…' });
   const add = () => {
     const v = inp.value.trim(); if (!v) return;
-    DB.goals.push({ id: uid(), scope, period: key, title: v, why: '', categoryId: '', startDate: today(), deadline: goalDefaultDeadline(scope,key), priority: 0, target: '', done: false, createdAt: today() });
+    DB.goals.push({ id: uid(), scope, period: key, title: v, why: '', categoryId: '', startDate: today(), deadline: goalDefaultDeadline(scope,key), priority: 0, measurement: 'output', kpiName: '', kpiUnit: '', kpiCurrent: '', kpiTarget: '', reviewDate: '', milestones: '', successCriteria: '', nextAction: '', blocker: '', done: false, createdAt: today() });
     inp.value = ''; commit(); toast('Goal added', 'check');
   };
   inp.onkeydown = e => { if (e.key === 'Enter') add(); };
@@ -4249,6 +4292,12 @@ const AppGoals = {
     const openY = goalsIn('year', periodKey('year', 0)).filter(g => !g.done).length;
     body.append(h('div', { class: 'tiny', style: { marginBottom: '12px' },
       text: openW ? `${openW} thing${openW === 1 ? '' : 's'} left this week${openY ? ` · ${openY} still open for the year` : ''}` : 'The week is clear. Set the next one.' }));
+    const kpiGoals = allOpen.filter(g => goalKpiPct(g) != null);
+    if (kpiGoals.length) {
+      const kpiStrip = h('div', { class: 'goal-kpi-strip' });
+      kpiGoals.slice(0,4).forEach(g => { const pct=goalKpiPct(g); kpiStrip.append(h('div',{class:'goal-kpi-mini',html:`<div class="goal-kpi-top"><span>${esc(g.kpiName||g.title)}</span><strong>${pct}%</strong></div><div class="goal-kpi-bar"><i style="width:${pct}%"></i></div>`})); });
+      body.append(kpiStrip);
+    }
 
     const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', alignItems: 'start' } });
     SCOPES.forEach(s => grid.append(goalColumn(s.k, st, re)));
@@ -4343,6 +4392,8 @@ const AppHome = {
       tile('Events', String(evToday.length), evToday.length ? 'on the calendar' : 'nothing scheduled', 'calendar'),
       tile('Habits', `${habitsDone}/${DB.habits.length}`, 'done today', 'habits'),
       tile('Spent', money(mSpent), `in ${MON[new Date().getMonth()]}`, 'finance'));
+    const bl = bodyLatest && bodyLatest();
+    if (bl) tiles.append(tile('Weight', bl.weight != null ? `${bl.weight} kg` : '—', bl.date === T ? 'latest check-in' : fmtDate(bl.date), 'body'));
     body.append(tiles);
 
     const cols = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', marginTop: '14px' } });
@@ -4421,16 +4472,96 @@ const AppHome = {
 };
 
 /* ============================================================
+   BODY TRACKER — weight, protein, measurements
+   ============================================================ */
+function ensureBodyTracker(){
+  DB.bodyTracker ||= { proteinTarget:'', weightTarget:'', entries:[] };
+  DB.bodyTracker.entries ||= [];
+  return DB.bodyTracker;
+}
+function bodyLatest(){
+  const b=ensureBodyTracker();
+  return b.entries.slice().sort((a,z)=>String(z.date).localeCompare(String(a.date)))[0] || null;
+}
+function bodyPrev(){
+  const b=ensureBodyTracker();
+  return b.entries.slice().sort((a,z)=>String(z.date).localeCompare(String(a.date)))[1] || null;
+}
+function bodyNum(v){ return v==='' || v==null ? null : Number(v); }
+function bodyDelta(a,b){
+  if(a==null||b==null||!Number.isFinite(a)||!Number.isFinite(b)) return '—';
+  const d=a-b; return `${d>0?'+':''}${d.toFixed(1)}`;
+}
+async function editBodyEntry(e={}){
+  const out=await formModal(e.id?'Edit body check-in':'New body check-in',[
+    {type:'row',fields:[{k:'date',label:'Date',type:'date'},{k:'weight',label:'Weight (kg)',type:'number',min:0,step:'0.1'}]},
+    {type:'row',fields:[{k:'protein',label:'Protein (g)',type:'number',min:0,step:'1'},{k:'waist',label:'Waist (cm)',type:'number',min:0,step:'0.1'}]},
+    {type:'row',fields:[{k:'stomach',label:'Stomach (cm)',type:'number',min:0,step:'0.1'},{k:'hip',label:'Hip (cm)',type:'number',min:0,step:'0.1'}]},
+    {type:'row',fields:[{k:'arm',label:'Arm (cm)',type:'number',min:0,step:'0.1'},{k:'thigh',label:'Thigh (cm)',type:'number',min:0,step:'0.1'}]},
+    {k:'notes',label:'Notes',type:'textarea',rows:2,placeholder:'Training, food, cycle, sleep, travel, or anything that explains the numbers.'}
+  ],{date:today(),...e},{onDelete:e.id?async()=>{DB.bodyTracker.entries=DB.bodyTracker.entries.filter(x=>x.id!==e.id);commit();toast('Check-in deleted','trash')}:null});
+  if(!out)return;
+  Object.keys(out).forEach(k=>{if(['weight','protein','waist','stomach','hip','arm','thigh'].includes(k))out[k]=bodyNum(out[k]);});
+  if(e.id) Object.assign(DB.bodyTracker.entries.find(x=>x.id===e.id),out);
+  else DB.bodyTracker.entries.push({id:uid(),createdAt:today(),...out});
+  commit();
+}
+async function editBodySettings(){
+  const b=ensureBodyTracker();
+  const out=await formModal('Tracker targets',[
+    {type:'row',fields:[{k:'weightTarget',label:'Weight target (kg)',type:'number',min:0,step:'0.1'},{k:'proteinTarget',label:'Protein target (g)',type:'number',min:0,step:'1'}]}
+  ],b);
+  if(!out)return;
+  b.weightTarget=bodyNum(out.weightTarget); b.proteinTarget=bodyNum(out.proteinTarget); commit();
+}
+function bodySpark(entries,key){
+  const vals=entries.map(e=>bodyNum(e[key])).filter(v=>v!=null&&Number.isFinite(v));
+  if(vals.length<2)return h('div',{class:'tiny',text:'Add at least two check-ins to see a trend.'});
+  const max=Math.max(...vals), min=Math.min(...vals), span=Math.max(.1,max-min);
+  const wrap=h('div',{class:'body-spark'});
+  entries.forEach(e=>{const v=bodyNum(e[key]); if(v==null)return; const hgt=18+((v-min)/span)*62; const bar=h('div',{class:'body-bar',style:{height:hgt+'px'}}); bindTip(bar,()=>`<div class="tk">${esc(fmtDate(e.date))}</div><div class="tv">${v} ${key==='weight'?'kg':key==='protein'?'g':'cm'}</div>`); wrap.append(bar);});
+  return wrap;
+}
+const AppBody={
+  id:'body',name:'Body',icon:'activity',color:'#ff5c8a',w:980,h:700,
+  render(root,re,st){
+    const b=ensureBodyTracker(), entries=b.entries.slice().sort((a,z)=>String(a.date).localeCompare(String(z.date))), latest=bodyLatest(), prev=bodyPrev();
+    const app=h('div',{class:'app'}), head=h('div',{class:'app-head'});
+    head.append(h('div',{},h('h2',{text:'Body Tracker'}),h('div',{class:'sub',text:'Weight · protein · measurements'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('settings',13)} Targets`,onclick:editBodySettings}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Check-in`,onclick:()=>editBodyEntry()})); app.append(head);
+    const body=h('div',{class:'app-body'});
+    if(!latest){body.append(h('div',{class:'body-empty card',html:`<div class="body-empty-orb">${icon('activity',32,1.6)}</div><div><h3>Build your baseline</h3><div class="tiny">Log one check-in. Orbit will turn the raw numbers into trends, target progress and measurement changes.</div></div>`}));}
+    const top=h('div',{class:'body-dashboard'});
+    const stat=(label,val,unit,delta,cls)=>h('div',{class:'body-stat '+(cls||''),html:`<div class="body-stat-icon">${icon(cls==='protein'?'bolt':cls==='weight'?'activity':'grid',16,2)}</div><div class="k">${esc(label)}</div><div class="v">${val==null?'—':esc(String(val))}<span>${unit||''}</span></div><div class="d">${delta||'No previous check-in'}</div>`});
+    top.append(stat('Weight',latest?.weight,' kg',latest&&prev?bodyDelta(latest.weight,prev.weight)+' kg':'','weight'),stat('Protein',latest?.protein,' g',latest&&b.proteinTarget?`${Math.round((latest.protein/b.proteinTarget)*100)}% of target`:'Set a target','protein'),stat('Waist',latest?.waist,' cm',latest&&prev?bodyDelta(latest.waist,prev.waist)+' cm':'','measure'));
+    body.append(top);
+    const target=h('div',{class:'body-targets'});
+    const pPct=latest&&b.proteinTarget?clamp(Math.round(latest.protein/b.proteinTarget*100),0,140):0;
+    const wPct=latest&&b.weightTarget&&latest.weight?clamp(Math.round((1-Math.abs(latest.weight-b.weightTarget)/Math.max(latest.weight,b.weightTarget))*100),0,100):0;
+    target.innerHTML=`<div class="body-target-card"><div class="body-target-head"><span>Protein target</span><strong>${b.proteinTarget?`${latest?.protein||0}/${b.proteinTarget} g`:'Not set'}</strong></div><div class="body-target-bar"><i style="width:${Math.min(100,pPct)}%"></i></div><div class="tiny">${b.proteinTarget?(pPct>=100?'Target reached':`${pPct}% today`):'Set a daily target'}</div></div><div class="body-target-card"><div class="body-target-head"><span>Weight target</span><strong>${b.weightTarget?`${latest?.weight||'—'} → ${b.weightTarget} kg`:'Not set'}</strong></div><div class="body-target-bar pink"><i style="width:${wPct}%"></i></div><div class="tiny">${b.weightTarget?'Target distance is visualised, not judged.':'Set a target if you want one.'}</div></div>`;
+    body.append(target);
+    const charts=h('div',{class:'grid',style:{gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',marginTop:'14px'}});
+    [['weight','Weight trend','kg'],['protein','Protein trend','g']].forEach(([k,t,u])=>{const c=h('div',{class:'card body-chart'});c.append(h('div',{class:'body-chart-head'},h('h3',{text:t}),h('span',{class:'tiny',text:`${entries.length} check-ins`})));c.append(bodySpark(entries.slice(-14),k));charts.append(c);});
+    body.append(charts);
+    const mc=h('div',{class:'card',style:{marginTop:'14px'}}); mc.append(h('div',{class:'body-chart-head'},h('h3',{text:'Measurements'}),h('span',{class:'tiny',text:latest?fmtDate(latest.date):'No data'})));
+    const ms=[['waist','Waist'],['stomach','Stomach'],['hip','Hip'],['arm','Arm'],['thigh','Thigh']]; const mg=h('div',{class:'measure-grid'});
+    ms.forEach(([k,l])=>{const v=latest?.[k], d=latest&&prev?bodyDelta(v,prev[k]):null; mg.append(h('div',{class:'measure-card',html:`<div class="measure-name">${l}</div><div class="measure-v">${v==null?'—':v}<span>cm</span></div><div class="measure-d ${d&&d<0?'good':''}">${d==null?'—':(d>0?'+':'')+d+' cm'}</div>`}));}); mc.append(mg); body.append(mc);
+    const hist=h('div',{class:'card',style:{marginTop:'14px'}}); hist.append(h('div',{class:'body-chart-head'},h('h3',{text:'Check-in history'}),h('span',{class:'tiny',text:'Click a row to edit'})));
+    const table=h('div',{class:'body-history'}); entries.slice().reverse().slice(0,12).forEach(e=>{const row=h('button',{class:'body-history-row',onclick:()=>editBodyEntry(e)});row.innerHTML=`<span>${esc(fmtDate(e.date,{month:'short',day:'numeric',year:'numeric'}))}</span><strong>${e.weight??'—'} kg</strong><span>${e.protein??'—'} g protein</span><span>${e.waist??'—'} / ${e.hip??'—'} cm</span>`;table.append(row)}); if(!entries.length)table.append(h('div',{class:'tiny',style:{padding:'10px'},text:'No check-ins yet.'})); hist.append(table); body.append(hist);
+    app.append(body);root.append(app);
+  }
+};
+
+/* ============================================================
    SETTINGS
    ============================================================ */
 const WALLS = [['aurora', 'Aurora'], ['mesh', 'Mesh'], ['plain', 'Plain']];
 const ACCENTS = [
-  ['#c9265a', 'Raspberry'], ['#7b3f92', 'Aubergine'], ['#8e2f4f', 'Wine'],
-  ['#b5561c', 'Terracotta'], ['#2e7d63', 'Fern'], ['#4a5fa5', 'Indigo'],
-  ['#e74c5e', 'Coral'], ['#e8a33a', 'Amber'], ['#2ecc71', 'Mint'],
-  ['#1abc9c', 'Teal'], ['#3498db', 'Sky'], ['#6366f1', 'Iris'],
-  ['#8b5cf6', 'Violet'], ['#d946ef', 'Orchid'], ['#ec4899', 'Fuchsia'],
-  ['#fb7185', 'Rose'], ['#f97316', 'Ember'], ['#06b6d4', 'Lagoon'],
+  ['#ff5c8a', 'Neon Rose'], ['#ff7657', 'Solar Coral'], ['#ffc857', 'Electric Amber'],
+  ['#36d399', 'Mint Flux'], ['#2dd4bf', 'Aqua Teal'], ['#4cc9f0', 'Sky Pulse'],
+  ['#3b82f6', 'Cobalt'], ['#6366f1', 'Iris'], ['#8b5cf6', 'Violet'],
+  ['#a78bfa', 'Lavender'], ['#d946ef', 'Orchid'], ['#f472b6', 'Fuchsia'],
+  ['#fb7185', 'Rose'], ['#ff8a3d', 'Ember'], ['#fbbf24', 'Honey'],
+  ['#22c55e', 'Emerald'], ['#06b6d4', 'Lagoon'], ['#8e2f4f', 'Wine'],
 ];
 
 function applySettings() {
@@ -4932,7 +5063,7 @@ const G = {
 /* how much is actually in a database — used to refuse dangerous overwrites */
 function dbSize(p) {
   if (!p || typeof p !== 'object') return 0;
-  return ['events', 'tasks', 'notes', 'habits', 'txns', 'trips', 'courses', 'wishlist', 'goals', 'projects', 'journal']
+  return ['events', 'tasks', 'notes', 'habits', 'txns', 'trips', 'courses', 'wishlist', 'goals', 'projects', 'journal', 'bodyTracker']
     .reduce((a, k) => a + ((p[k] || []).length), 0) + (((p.vision || {}).pillars || []).length);
 }
 
@@ -5098,7 +5229,7 @@ function startGoogleLoop() {
 /* ============================================================
    REGISTRY · SPOTLIGHT · BOOT
    ============================================================ */
-const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppNotes, AppHabits, AppFocus,
+const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppBody, AppNotes, AppHabits, AppFocus,
   AppFinance, AppCourses, AppTrips,
   Object.assign({ sep: true }, AppSettings)];
 
