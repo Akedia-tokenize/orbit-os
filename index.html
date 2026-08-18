@@ -114,6 +114,50 @@ button{cursor:pointer;background:none;border:none;padding:0}
 html[data-theme="light"] #desktop::after{background-image:radial-gradient(circle at 1px 1px, rgba(60,26,52,.055) 1px, transparent 0)}
 body[data-wall="plain"] #desktop{background:linear-gradient(170deg,var(--wall-2),var(--bg))}
 body[data-wall="plain"] #desktop::after{display:none}
+
+/* ---------- richer desktop atmosphere ---------- */
+#desktop::before{
+  content:""; position:absolute; inset:-12%;
+  pointer-events:none; opacity:.52;
+  background:
+    radial-gradient(520px 320px at 18% 22%, rgba(238,107,147,.16), transparent 68%),
+    radial-gradient(620px 380px at 82% 74%, rgba(139,95,191,.18), transparent 70%),
+    radial-gradient(420px 300px at 58% 8%, rgba(57,135,229,.08), transparent 70%);
+  filter:blur(12px);
+  animation:orbitAtmosphere 18s ease-in-out infinite alternate;
+}
+@keyframes orbitAtmosphere{from{transform:translate3d(-1.5%,0,0) scale(1)}to{transform:translate3d(1.5%,1%,0) scale(1.035)}}
+body[data-wall="mesh"] #desktop{
+  background:
+    linear-gradient(115deg,rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(35deg,rgba(255,255,255,.02) 1px,transparent 1px),
+    radial-gradient(900px 600px at 15% 15%,rgba(139,95,191,.30),transparent 65%),
+    radial-gradient(800px 520px at 88% 76%,rgba(238,107,147,.20),transparent 65%),
+    linear-gradient(145deg,var(--wall-2),var(--bg));
+  background-size:34px 34px,34px 34px,auto,auto,auto;
+}
+html[data-theme="light"] #desktop::before{opacity:.30}
+
+/* creative dock icons */
+.dock-btn{
+  position:relative; overflow:visible;
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 8px 18px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.dock-btn::before{
+  content:""; position:absolute; inset:-5px;
+  border:1px solid currentColor; border-radius:30%;
+  opacity:0; transform:rotate(-18deg) scale(.82);
+  transition:opacity .18s, transform .18s;
+}
+.dock-btn::after{
+  content:""; position:absolute; width:6px;height:6px;border-radius:50%;
+  right:-2px;top:-2px;background:currentColor;
+  box-shadow:0 0 0 3px rgba(255,255,255,.08);
+  opacity:.0; transition:opacity .18s;
+}
+.dock-item:hover .dock-btn::before{opacity:.28;transform:rotate(-18deg) scale(1)}
+.dock-item:hover .dock-btn::after{opacity:.8}
 body[data-wall="mesh"] #desktop{
   background:
     radial-gradient(700px 500px at 20% 20%, rgba(139,95,191,.34), transparent 60%),
@@ -431,6 +475,58 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
 .pomo-mode button{padding:5px 15px;border-radius:99px;font-size:12.5px;font-weight:600;color:var(--text-2)}
 .pomo-mode button.on{background:var(--accent);color:#fff}
 
+/* ---------- goal command summary ---------- */
+.goal-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.goal-summary>div{position:relative;overflow:hidden;padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(145deg,var(--surface-2),var(--surface))}
+.goal-summary>div::after{content:"";position:absolute;width:80px;height:80px;right:-25px;top:-28px;border-radius:50%;background:var(--accent-soft);filter:blur(3px)}
+.goal-summary .k{display:block;font-size:9.5px;letter-spacing:.11em;color:var(--muted);font-weight:800}
+.goal-summary strong{display:block;font-size:20px;line-height:1.15;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal-summary small{display:block;color:var(--text-2);font-size:10.5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:650px){.goal-summary{grid-template-columns:1fr}.goal-summary>div{min-height:80px}}
+
+/* ---------- home command center ---------- */
+.home-hero{
+  position:relative; overflow:hidden; min-height:180px; display:flex; align-items:center;
+  gap:18px; padding:24px 28px; margin-bottom:16px;
+  border:1px solid var(--border-strong); border-radius:18px;
+  background:
+    radial-gradient(500px 220px at 90% 20%,rgba(139,95,191,.28),transparent 70%),
+    radial-gradient(400px 220px at 15% 100%,rgba(238,107,147,.20),transparent 70%),
+    linear-gradient(135deg,var(--glass-strong),rgba(55,31,67,.55));
+  backdrop-filter:blur(18px) saturate(135%);
+  box-shadow:var(--shadow-glass);
+}
+.home-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.045),transparent 70%);pointer-events:none}
+.home-hero-copy{position:relative;z-index:2;max-width:600px}
+.home-kicker{font-size:10px;letter-spacing:.18em;font-weight:800;color:var(--accent);margin-bottom:7px}
+.home-title{font-size:31px;line-height:1.05;font-weight:700;letter-spacing:-.035em}
+.home-date{font-size:13px;color:var(--text-2);margin-top:8px}
+.home-note{font-size:12px;color:var(--muted);margin-top:12px;max-width:520px}
+.home-live{position:relative;z-index:2;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.04em;color:var(--text);white-space:nowrap}
+.home-orb{position:relative;width:120px;height:120px;flex:0 0 120px;display:grid;place-items:center;color:var(--text);border-radius:50%;background:radial-gradient(circle,var(--accent-soft),transparent 62%);z-index:1}
+.home-orb i{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,var(--accent),var(--plum));box-shadow:0 12px 30px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.24)}
+.home-orbit{position:absolute;border:1px solid rgba(255,255,255,.18);border-radius:50%;inset:4px;transform:rotate(-20deg)}
+.home-orbit.o1{inset:0 8px;transform:rotate(24deg)}
+.home-orbit.o2{inset:10px -4px;transform:rotate(-38deg)}
+.home-orbit.o3{inset:-6px 16px;transform:rotate(68deg);opacity:.5}
+.home-stat{
+  position:relative;overflow:hidden;padding:14px 15px 13px 58px;min-height:106px;
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border);border-radius:13px;
+  transition:transform .18s,box-shadow .18s,border-color .18s;
+}
+.home-stat:hover{transform:translateY(-3px);box-shadow:var(--shadow-glass);border-color:var(--border-strong)}
+.home-stat-icon{
+  position:absolute;left:14px;top:14px;width:32px;height:32px;border-radius:10px;
+  display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,var(--tile),color-mix(in srgb,var(--tile) 55%,#000));
+  box-shadow:0 6px 14px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.2)
+}
+.home-stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.home-stat .v{font-size:25px;line-height:1.05;font-weight:600;margin-top:5px}
+.home-stat .d{font-size:11px;color:var(--text-2);margin-top:5px}
+@media(max-width:700px){
+  .home-hero{padding:20px;min-height:155px}.home-orb{width:86px;height:86px;flex-basis:86px}.home-orb i{width:48px;height:48px}.home-title{font-size:25px}.home-note{display:none}.home-live{font-size:20px}
+}
 /* ---------- finance / charts ---------- */
 .stat{
   position:relative; overflow:hidden;
@@ -764,7 +860,7 @@ const Vault = (() => {
   };
 })();
 
-const BUILD = '2026-08-18 · 7';
+const BUILD = '2026-08-18 · 8';
 
 const DEFAULTS = () => ({
   version: 1,
@@ -1759,15 +1855,64 @@ function quickParse(raw) {
   return t;
 }
 
+
+function ensureTaskCategories(){
+  DB.projects ||= [];
+  if (!DB.projects.length){
+    DB.projects = [
+      { id: uid(), name: 'Personal', color: 'var(--s1)' },
+      { id: uid(), name: 'Work', color: 'var(--s2)' },
+      { id: uid(), name: 'Home', color: 'var(--s3)' },
+      { id: uid(), name: 'Learning', color: 'var(--s7)' }
+    ];
+  }
+  return DB.projects;
+}
+function categoryOfTask(t){ return projOf(t.projectId); }
+function goalCategoryName(g){
+  const p = DB.projects?.find(x => x.id === g.categoryId);
+  return p ? p.name : '';
+}
+function goalDeadline(g){
+  if (g.deadline) return g.deadline;
+  if (g.scope && g.period){
+    if (g.scope === 'week') return addDays(g.period, 6);
+    if (g.scope === 'month') {
+      const y=+g.period.slice(0,4), m=+g.period.slice(5,7);
+      return `${y}-${pad(m)}-${pad(new Date(y,m,0).getDate())}`;
+    }
+    if (g.scope === 'year') return `${g.period}-12-31`;
+  }
+  return '';
+}
+function goalDeadlineText(g){
+  const d=goalDeadline(g); if(!d) return 'No deadline';
+  const n=daysBetween(today(),d);
+  const date=fmtDate(d,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  if(g.done) return `Completed · ${date}`;
+  if(n<0) return `Overdue · ${date}`;
+  if(n===0) return `Due today · ${date}`;
+  return `${date} · ${n} day${n===1?'':'s'} left`;
+}
+function goalDefaultDeadline(scope,key){
+  if(scope==='week') return addDays(key,6);
+  if(scope==='month'){
+    const y=+key.slice(0,4),m=+key.slice(5,7);
+    return `${y}-${pad(m)}-${pad(new Date(y,m,0).getDate())}`;
+  }
+  return `${key}-12-31`;
+}
+
 async function editTask(t) {
   const isNew = !t.id;
+  ensureTaskCategories();
   const out = await formModal(isNew ? 'New task' : 'Edit task', [
-    { k: 'title', label: 'Task', required: true },
+    { k: 'title', label: 'Task', required: true, placeholder: 'What needs to move forward?' },
     { type: 'row', fields: [
-      { k: 'due', label: 'Due', type: 'date' },
+      { k: 'due', label: 'Due date', type: 'date' },
       { k: 'pri', label: 'Priority', type: 'select', options: PRI.map(p => [p.v, p.name]) }] },
-    { k: 'projectId', label: 'Project', type: 'select', options: [['', '— none —'], ...DB.projects.map(p => [p.id, p.name])] },
-    { k: 'notes', label: 'Notes', type: 'textarea', rows: 3 },
+    { k: 'projectId', label: 'Category', type: 'select', options: [['', '— uncategorised —'], ...DB.projects.map(p => [p.id, p.name])] },
+    { k: 'notes', label: 'Notes', type: 'textarea', rows: 3, placeholder: 'Optional context' },
   ], { pri: 0, ...t }, {
     onDelete: isNew ? null : async () => { DB.tasks = DB.tasks.filter(x => x.id !== t.id); dropTaskEvent(t.id); commit(); toast('Task deleted', 'trash'); }
   });
@@ -1826,26 +1971,28 @@ const AppTasks = {
     };
     side.append(nav('today', 'Today', 'bolt', counts.today), nav('week', 'Next 7 days', 'calendar', counts.week),
       nav('all', 'All open', 'tasks', counts.all), nav('none', 'No date', 'clock', counts.none));
-    side.append(h('div', { class: 'side-h', text: 'Projects' }));
+    ensureTaskCategories();
+    side.append(h('div', { class: 'side-h', text: 'Categories' }));
     DB.projects.forEach(p => {
       const open = DB.tasks.filter(t => t.projectId === p.id && !t.done).length;
       const b = h('button', { class: 'navitem' + (st.filter === 'p:' + p.id ? ' active' : ''), onclick: () => { st.filter = 'p:' + p.id; re(); } });
       b.innerHTML = `<i class="dot" style="background:${p.color}"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>${open ? `<span class="cnt">${open}</span>` : ''}`;
       b.oncontextmenu = async e => {
         e.preventDefault();
-        if (await confirmModal('Delete project?', `"${p.name}" will be removed. Its tasks stay, just without a project.`)) {
+        if (await confirmModal('Delete category?', `"${p.name}" will be removed. Its tasks stay, just without a category.`)) {
           DB.projects = DB.projects.filter(x => x.id !== p.id);
           DB.tasks.forEach(t => { if (t.projectId === p.id) t.projectId = ''; });
+          DB.goals.forEach(g => { if (g.categoryId === p.id) g.categoryId = ''; });
           st.filter = 'all'; commit();
         }
       };
       side.append(b);
     });
-    const addP = h('button', { class: 'navitem', style: { color: 'var(--muted)' }, html: `${icon('plus', 14)}<span>New project</span>`, onclick: async () => {
-      const o = await formModal('New project', [
-        { k: 'name', label: 'Name', required: true },
+    const addP = h('button', { class: 'navitem', style: { color: 'var(--muted)' }, html: `${icon('plus', 14)}<span>New category</span>`, onclick: async () => {
+      const o = await formModal('New category', [
+        { k: 'name', label: 'Name', required: true, placeholder: 'e.g. Health, Finance, Personal brand' },
         { k: 'color', label: 'Colour', type: 'color' }], {});
-      if (o && o.name) { DB.projects.push({ id: uid(), name: o.name, color: o.color }); commit(); }
+      if (o && o.name) { DB.projects.push({ id: uid(), name: o.name.trim(), color: o.color }); commit(); }
     } });
     side.append(addP);
 
@@ -3985,16 +4132,36 @@ const goalsIn = (scope, key) => DB.goals.filter(g => g.scope === scope && g.peri
 
 async function editGoal(g, scope, key) {
   const isNew = !g.id;
+  ensureTaskCategories();
+  const chosenScope = scope || g.scope || 'week';
+  const chosenKey = key || g.period || periodKey(chosenScope, 0);
   const out = await formModal(isNew ? 'New goal' : 'Edit goal', [
-    { k: 'title', label: 'Goal', required: true, placeholder: 'What has to be true by the end of it?' },
-    { k: 'why', label: 'Why this one', type: 'textarea', rows: 2, placeholder: 'Optional — but it helps on the bad days.' },
+    { k: 'title', label: 'Goal', required: true, placeholder: 'What must be true by the deadline?' },
+    { k: 'categoryId', label: 'Category', type: 'select', options: [['', '— uncategorised —'], ...DB.projects.map(p => [p.id, p.name])] },
+    { type: 'row', fields: [
+      { k: 'startDate', label: 'Start date', type: 'date' },
+      { k: 'deadline', label: 'Exact deadline', type: 'date', required: true }] },
     { type: 'row', fields: [
       { k: 'scope', label: 'Horizon', type: 'select', options: SCOPES.map(s => [s.k, s.label]) },
-      { k: 'period', label: 'Period', hint: 'week = its Monday/Sunday date, month = 2026-08, year = 2026' }] },
-  ], { scope: scope || 'week', period: key || periodKey(scope || 'week', 0), ...g }, {
+      { k: 'period', label: 'Planning period', hint: 'Used for weekly/monthly/yearly views.' }] },
+    { type: 'row', fields: [
+      { k: 'priority', label: 'Priority', type: 'select', options: PRI.map(p => [p.v, p.name]) },
+      { k: 'target', label: 'Target / metric', placeholder: 'e.g. 120g, 10 calls, €5,000' }] },
+    { k: 'why', label: 'Why this one', type: 'textarea', rows: 2, placeholder: 'Why does this matter?' },
+  ], {
+    scope: chosenScope,
+    period: chosenKey,
+    startDate: g.startDate || today(),
+    deadline: g.deadline || goalDefaultDeadline(chosenScope, chosenKey),
+    priority: g.priority ?? 0,
+    categoryId: g.categoryId || '',
+    target: g.target || '',
+    ...g
+  }, {
     onDelete: isNew ? null : async () => { DB.goals = DB.goals.filter(x => x.id !== g.id); commit(); toast('Goal deleted', 'trash'); }
   });
   if (!out) return;
+  out.priority = Number(out.priority) || 0;
   if (isNew) DB.goals.push({ id: uid(), done: false, createdAt: today(), ...out });
   else Object.assign(DB.goals.find(x => x.id === g.id), out);
   commit();
@@ -4028,7 +4195,17 @@ function goalColumn(scope, st, re) {
     cb.onclick = () => { g.done = !g.done; if (g.done) toast('One goal down', 'check'); commit(); };
     const mid = h('div', { style: { flex: '1', minWidth: 0, cursor: 'pointer' }, onclick: () => editGoal(g) });
     mid.append(h('div', { class: 'ttl', text: g.title }));
-    if (g.why) mid.append(h('div', { class: 'meta' }, h('span', { class: 'tiny', text: g.why })));
+    const gm = h('div', { class: 'meta' });
+    const gc = goalCategoryName(g);
+    if (gc) {
+      const gp = DB.projects.find(x => x.id === g.categoryId);
+      gm.append(h('span', { class: 'chip', html: `<i class="dot" style="background:${gp?.color || 'var(--accent)'}"></i>${esc(gc)}` }));
+    }
+    gm.append(h('span', { class: 'due ' + (g.done ? '' : (goalDeadline(g) < today() ? 'over' : '')), text: goalDeadlineText(g) }));
+    if (g.target) gm.append(h('span', { class: 'tiny', text: 'Target: ' + g.target }));
+    if (g.priority) gm.append(h('span', { class: 'pri', style: { background: PRI[g.priority].c }, title: PRI[g.priority].name }));
+    if (g.why) gm.append(h('span', { class: 'tiny', text: g.why }));
+    if (gm.children.length) mid.append(gm);
     row.append(cb, mid);
     box.append(row);
   });
@@ -4038,7 +4215,7 @@ function goalColumn(scope, st, re) {
   const inp = h('input', { class: 'inp', placeholder: 'Add a goal…' });
   const add = () => {
     const v = inp.value.trim(); if (!v) return;
-    DB.goals.push({ id: uid(), scope, period: key, title: v, why: '', done: false, createdAt: today() });
+    DB.goals.push({ id: uid(), scope, period: key, title: v, why: '', categoryId: '', startDate: today(), deadline: goalDefaultDeadline(scope,key), priority: 0, target: '', done: false, createdAt: today() });
     inp.value = ''; commit(); toast('Goal added', 'check');
   };
   inp.onkeydown = e => { if (e.key === 'Enter') add(); };
@@ -4058,6 +4235,16 @@ const AppGoals = {
     app.append(head);
 
     const body = h('div', { class: 'app-body' });
+    const allOpen = DB.goals.filter(g => !g.done);
+    const overdue = allOpen.filter(g => goalDeadline(g) && goalDeadline(g) < today()).length;
+    const dated = allOpen.filter(g => goalDeadline(g)).sort((a,b) => goalDeadline(a).localeCompare(goalDeadline(b)));
+    const nearest = dated[0];
+    const summary = h('div', { class: 'goal-summary' });
+    summary.innerHTML = `<div><span class="k">OPEN</span><strong>${allOpen.length}</strong><small>goals</small></div>
+      <div><span class="k">OVERDUE</span><strong style="color:${overdue ? 'var(--crit)' : 'var(--good)'}">${overdue}</strong><small>${overdue ? 'need attention' : 'nothing late'}</small></div>
+      <div><span class="k">NEXT DEADLINE</span><strong>${nearest ? esc(goalDeadlineText(nearest).split(' · ')[0]) : '—'}</strong><small>${nearest ? esc(nearest.title) : 'Set a goal with a date'}</small></div>`;
+    body.append(summary);
+
     const openW = goalsIn('week', periodKey('week', 0)).filter(g => !g.done).length;
     const openY = goalsIn('year', periodKey('year', 0)).filter(g => !g.done).length;
     body.append(h('div', { class: 'tiny', style: { marginBottom: '12px' },
@@ -4117,6 +4304,23 @@ const AppHome = {
       body.append(w);
     }
 
+    /* visual command center */
+    const hero = h('div', { class: 'home-hero' });
+    const heroOrb = h('div', { class: 'home-orb' });
+    heroOrb.innerHTML = `<span class="home-orbit o1"></span><span class="home-orbit o2"></span><span class="home-orbit o3"></span><i>${icon('compass', 34, 1.5)}</i>`;
+    const heroCopy = h('div', { class: 'home-hero-copy' });
+    heroCopy.append(
+      h('div', { class: 'home-kicker', text: 'YOUR DAY, IN ORBIT' }),
+      h('div', { class: 'home-title', text: `${greeting()}${name ? ', ' + name : ''}` }),
+      h('div', { class: 'home-date', text: fmtDate(T, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) }),
+      h('div', { class: 'home-note', text: 'One place for what you need to do, what you want to become, and what is happening today.' })
+    );
+    const live = h('div', { class: 'home-live' });
+    const paintClock = () => { live.textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); };
+    paintClock(); setInterval(paintClock, 30000);
+    hero.append(heroCopy, h('div', { class: 'home-hero-spacer' }), live, heroOrb);
+    body.append(hero);
+
     /* quick numbers */
     const openTasks = DB.tasks.filter(t => !t.done);
     const dueToday = openTasks.filter(t => t.due && t.due <= T);
@@ -4127,7 +4331,10 @@ const AppHome = {
 
     const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' } });
     const tile = (k, v, d, appId) => {
-      const n = h('div', { class: 'stat', style: { cursor: 'pointer' }, html: `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div>` });
+      const a = APPS.find(x => x.id === appId);
+      const n = h('div', { class: 'home-stat', style: { cursor: 'pointer' } });
+      n.innerHTML = `<div class="home-stat-icon" style="--tile:${a?.color || 'var(--accent)'}">${icon(a?.icon || 'grid', 19, 1.8)}</div>
+        <div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div>`;
       n.onclick = () => openApp(appId);
       return n;
     };
