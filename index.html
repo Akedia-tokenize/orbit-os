@@ -712,7 +712,7 @@ const DEFAULTS = () => ({
   events: [], tasks: [], projects: [], notes: [], journal: [], habits: [],
   sessions: [], txns: [], budgets: {}, trips: [],
   gTrash: [], gcals: [], cats: [], incomeCats: [], catPalette: {}, driveId: '', savedAt: '',
-  courses: [], wishlist: [],
+  courses: [], wishlist: [], goals: [],
   vision: { motto: '', statement: '', birthday: '', traits: [], pillars: [] }
 });
 
@@ -727,6 +727,11 @@ function loadDB() {
     DB.settings = Object.assign(DEFAULTS().settings, p.settings || {});
     DB.settings.pomo = Object.assign({ focus: 25, short: 5, long: 15 }, (p.settings || {}).pomo || {});
   } catch (e) { console.warn('Could not read saved data, starting fresh.', e); seed(); }
+  DB.cats = (DB.cats || []).filter(c => c !== 'Investment');
+  /* old "Investment" expenses become real investments on the Budgets tab */
+  (DB.txns || []).forEach(t => { if (t.type !== 'income' && /^investment$/i.test(t.category || '')) { t.type = 'invest'; t.category = t.asset || 'Other'; } });
+  DB.goals ||= [];
+  if (!DB.priV4) { (DB.tasks || []).forEach(t => { if (t.pri === 2) t.pri = 3; else if (t.pri === 1) t.pri = 2; }); DB.priV4 = 1; }
 }
 let saveTimer = null;
 function save() {
@@ -1343,6 +1348,7 @@ async function editEvent(ev) {
   if (useGoogle) out.cal = out.gcal ? 'gcal' : (ev.cal && ev.cal !== 'gcal' ? ev.cal : 'personal');
   if (isNew) DB.events.push({ id: uid(), ...out });
   else Object.assign(DB.events.find(e => e.id === ev.id), out);
+  if (ev.taskId) { const tk = DB.tasks.find(x => x.id === ev.taskId); if (tk) tk.due = out.date; }
   commit(); toast(isNew ? 'Event added' : 'Event updated');
   if (DB.settings.googleOn) googleSync({ silent: true });
 }
@@ -1566,9 +1572,21 @@ function calSidebar(re) {
    ============================================================ */
 const PRI = [
   { v: 0, name: 'None', c: 'transparent' },
-  { v: 1, name: 'Medium', c: 'var(--warn)' },
-  { v: 2, name: 'High', c: 'var(--crit)' },
+  { v: 1, name: 'Low', c: 'var(--s4)' },
+  { v: 2, name: 'Medium', c: 'var(--warn)' },
+  { v: 3, name: 'High', c: 'var(--crit)' },
 ];
+
+/* ---------- a task with a due date also lives on the calendar ---------- */
+function taskEvent(t) { return DB.events.find(e => e.taskId === t.id); }
+function syncTaskEvent(t) {
+  const ex = taskEvent(t);
+  if (!t.due) { if (ex) DB.events = DB.events.filter(e => e.id !== ex.id); return; }
+  const title = (t.done ? '\u2713 ' : '\u25a1 ') + t.title;
+  if (ex) { ex.date = t.due; ex.title = title; ex.notes = t.notes || ''; }
+  else DB.events.push({ id: uid(), taskId: t.id, title, date: t.due, allDay: true, cal: 'personal', notes: t.notes || '' });
+}
+function dropTaskEvent(id) { DB.events = DB.events.filter(e => e.taskId !== id); }
 const projOf = id => DB.projects.find(p => p.id === id);
 
 function dueClass(t) {
@@ -1586,8 +1604,9 @@ function taskSort(a, b) {
 /* natural-language quick add: "Pay rent tomorrow !high #Home" */
 function quickParse(raw) {
   let s = raw.trim(); const t = { pri: 0, due: '', projectId: '' };
-  s = s.replace(/!high|!h\b/i, () => { t.pri = 2; return ''; })
-       .replace(/!med(ium)?|!m\b/i, () => { t.pri = 1; return ''; });
+  s = s.replace(/!high|!h\b/i, () => { t.pri = 3; return ''; })
+       .replace(/!med(ium)?|!m\b/i, () => { t.pri = 2; return ''; })
+       .replace(/!low|!l\b/i, () => { t.pri = 1; return ''; });
   s = s.replace(/#(\S+)/g, (m, g) => {
     const p = DB.projects.find(p => p.name.toLowerCase() === g.toLowerCase());
     if (p) { t.projectId = p.id; return ''; }
@@ -1625,13 +1644,16 @@ async function editTask(t) {
     { k: 'projectId', label: 'Project', type: 'select', options: [['', '— none —'], ...DB.projects.map(p => [p.id, p.name])] },
     { k: 'notes', label: 'Notes', type: 'textarea', rows: 3 },
   ], { pri: 0, ...t }, {
-    onDelete: isNew ? null : async () => { DB.tasks = DB.tasks.filter(x => x.id !== t.id); commit(); toast('Task deleted', 'trash'); }
+    onDelete: isNew ? null : async () => { DB.tasks = DB.tasks.filter(x => x.id !== t.id); dropTaskEvent(t.id); commit(); toast('Task deleted', 'trash'); }
   });
   if (!out) return;
   out.pri = Number(out.pri) || 0;
-  if (isNew) DB.tasks.push({ id: uid(), done: false, createdAt: today(), ...out });
-  else Object.assign(DB.tasks.find(x => x.id === t.id), out);
+  let saved;
+  if (isNew) { saved = { id: uid(), done: false, createdAt: today(), ...out }; DB.tasks.push(saved); }
+  else { saved = Object.assign(DB.tasks.find(x => x.id === t.id), out); }
+  syncTaskEvent(saved);
   commit();
+  if (saved.due) toast('On your calendar for ' + relDay(saved.due), 'calendar');
 }
 
 function taskRow(t, re) {
@@ -1641,6 +1663,7 @@ function taskRow(t, re) {
   cb.onclick = () => {
     t.done = !t.done; t.completedAt = t.done ? today() : null;
     if (t.done) toast('Nice — one down', 'check');
+    syncTaskEvent(t);
     commit();
   };
   const mid = h('div', { style: { flex: '1', minWidth: 0, cursor: 'pointer' }, onclick: () => editTask(t) });
@@ -1704,14 +1727,22 @@ const AppTasks = {
     /* main */
     const main = h('div', { class: 'main', style: { display: 'flex', flexDirection: 'column' } });
     const qa = h('div', { class: 'quickadd' });
-    const inp = h('input', { class: 'inp', placeholder: 'Add a task…  try "Pay rent tomorrow !high #Home"' });
+    const inp = h('input', { class: 'inp', placeholder: 'Add a task…  try "Pay rent tomorrow !high #Home"  (!low !med !high)' });
     const submit = () => {
       const v = inp.value.trim(); if (!v) return;
       const t = quickParse(v);
       if (!t.projectId && st.filter.startsWith('p:')) t.projectId = st.filter.slice(2);
       if (!t.due && st.filter === 'today') t.due = today();
-      DB.tasks.push({ id: uid(), done: false, createdAt: today(), ...t });
+      const nt = { id: uid(), done: false, createdAt: today(), ...t };
+      DB.tasks.push(nt);
+      syncTaskEvent(nt);
+      /* never let a new task vanish into a filter you're not looking at */
+      const visible = st.filter === 'all' || (st.filter === 'today' && nt.due && nt.due <= today())
+        || (st.filter === 'week' && nt.due && daysBetween(today(), nt.due) >= 0 && daysBetween(today(), nt.due) <= 7)
+        || (st.filter === 'none' && !nt.due) || (st.filter === 'p:' + nt.projectId);
+      if (!visible) st.filter = 'all';
       inp.value = ''; commit();
+      toast('Task added' + (nt.due ? ' \u00b7 ' + relDay(nt.due) : ''), 'check');
       setTimeout(() => { const i = $('.quickadd .inp', root); if (i) i.focus(); }, 30);
     };
     inp.onkeydown = e => { if (e.key === 'Enter') submit(); };
@@ -2132,7 +2163,6 @@ const EXPENSE_CATS = [
   'Food & Drink',
   'Healthcare (Skin or Gym)',
   'Internet',
-  'Investment',
   'Bill',
 ];
 
@@ -2140,7 +2170,7 @@ const EXPENSE_CATS = [
    as many as you like from the Categories button in Budgets. */
 function expenseCats() {
   if (!DB.cats || !DB.cats.length) DB.cats = EXPENSE_CATS.slice();
-  const used = [...new Set(DB.txns.filter(t => t.type !== 'income').map(t => t.category))].filter(Boolean);
+  const used = [...new Set(DB.txns.filter(isExpense).map(t => t.category))].filter(Boolean);
   return [...new Set([...DB.cats, ...used])];
 }
 const NEW_CAT = '__new_category__';
@@ -2177,7 +2207,7 @@ const OTHER_C = 'var(--muted)';
 function catPalette() {
   const map = DB.catPalette || (DB.catPalette = {});
   const totals = {};
-  DB.txns.filter(t => !isIncome(t)).forEach(t => { const c = t.category || 'Uncategorised'; totals[c] = (totals[c] || 0) + t.amount; });
+  DB.txns.filter(isExpense).forEach(t => { const c = t.category || 'Uncategorised'; totals[c] = (totals[c] || 0) + t.amount; });
   const fresh = Object.keys(totals).filter(c => !(c in map));
   if (fresh.length) {
     const taken = new Set(Object.values(map).filter(i => i >= 0));
@@ -2203,6 +2233,31 @@ function monthsBack(n) {
   return out;
 }
 const isIncome = t => t.type === 'income';
+const isInvest = t => t.type === 'invest';
+const isExpense = t => !isIncome(t) && !isInvest(t);
+const ASSETS = ['Gold', 'Crypto', 'Stocks', 'Fund', 'Savings', 'Business', 'Other'];
+
+/* investments are not spending — they live on the Budgets tab */
+async function editInvest(t) {
+  const isNew = !t.id;
+  const out = await formModal(isNew ? 'New investment' : 'Edit investment', [
+    { k: 'date', label: 'Date', type: 'date', required: true },
+    { type: 'row', fields: [
+      { k: 'amount', label: 'Amount invested', type: 'number', step: '0.01', required: true },
+      { k: 'category', label: 'Into what', type: 'select', options: ASSETS.map(a => [a, a]) }] },
+    { k: 'source', label: 'Paid from', type: 'select', options: PAY_SOURCES.map(p => [p.v, p.v]) },
+    { k: 'reason', label: 'Note', type: 'textarea', rows: 2, placeholder: 'Why this one?' },
+  ], { date: today(), category: ASSETS[0], source: PAY_SOURCES[0].v, ...t }, {
+    onDelete: isNew ? null : async () => { DB.txns = DB.txns.filter(x => x.id !== t.id); commit(); toast('Deleted', 'trash'); }
+  });
+  if (!out) return;
+  out.type = 'invest';
+  out.amount = Math.abs(Number(out.amount) || 0);
+  if (isNew) DB.txns.push({ id: uid(), ...out });
+  else Object.assign(DB.txns.find(x => x.id === t.id), out);
+  Money.jumpTo = monthKey(out.date);
+  commit(); toast(isNew ? 'Investment logged' : 'Updated', 'wallet');
+}
 
 /* ---------- entry forms ---------- */
 async function editExpense(t) {
@@ -2459,7 +2514,8 @@ const AppFinance = {
 
     const body = h('div', { class: 'app-body' });
     const mt = DB.txns.filter(t => monthKey(t.date) === st.month);
-    const exp = mt.filter(t => !isIncome(t));
+    const exp = mt.filter(isExpense);
+    const inv = mt.filter(isInvest);
     const inc = mt.filter(isIncome);
     const spent = exp.reduce((a, t) => a + t.amount, 0);
     const earned = inc.reduce((a, t) => a + t.amount, 0);
@@ -2467,7 +2523,7 @@ const AppFinance = {
     if (st.tab === 'overview') overviewTab(body, st, re, { mt, exp, inc, spent, earned });
     if (st.tab === 'income') incomeTab(body, st, re, { inc, earned, spent });
     if (st.tab === 'wish') wishlistTab(body, st, re);
-    if (st.tab === 'budgets') budgetsTab(body, st, re, { exp });
+    if (st.tab === 'budgets') budgetsTab(body, st, re, { exp, inv });
     if (st.tab === 'txns') entriesTab(body, st, re, { mt });
 
     app.append(body); root.append(app);
@@ -2479,7 +2535,7 @@ function overviewTab(body, st, re, d) {
   const { exp, inc, spent, earned } = d;
 
   const prevKey = (() => { const [y, m] = st.month.split('-').map(Number); const x = new Date(y, m - 2, 1); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; })();
-  const prevSpent = DB.txns.filter(t => monthKey(t.date) === prevKey && !isIncome(t)).reduce((a, t) => a + t.amount, 0);
+  const prevSpent = DB.txns.filter(t => monthKey(t.date) === prevKey && isExpense(t)).reduce((a, t) => a + t.amount, 0);
   const delta = prevSpent ? Math.round((spent - prevSpent) / prevSpent * 100) : 0;
   const dim = new Date(+st.month.slice(0, 4), +st.month.slice(5, 7), 0).getDate();
   const elapsed = st.month === monthKey(today()) ? new Date().getDate() : dim;
@@ -2568,7 +2624,7 @@ function overviewTab(body, st, re, d) {
 
   /* in and out, six months — two series, one axis, same unit */
   const months = monthsBack(6);
-  const outs = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && !isIncome(t)).reduce((a, t) => a + t.amount, 0));
+  const outs = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && isExpense(t)).reduce((a, t) => a + t.amount, 0));
   const ins = months.map(m => DB.txns.filter(t => monthKey(t.date) === m && isIncome(t)).reduce((a, t) => a + t.amount, 0));
   const maxM = Math.max(1, ...outs, ...ins);
   const c4 = h('div', { class: 'card', style: { marginTop: '14px' } });
@@ -2762,7 +2818,8 @@ function wishlistTab(body, st, re) {
 
 /* ---------- BUDGETS ---------- */
 function budgetsTab(body, st, re, d) {
-  const { exp } = d;
+  const { exp, inv } = d;
+  investCard(body, inv || [], st);
   const byCat = {};
   exp.forEach(t => { const c = t.category || 'Uncategorised'; byCat[c] = (byCat[c] || 0) + t.amount; });
   const card = h('div', { class: 'card' });
@@ -2805,6 +2862,43 @@ function budgetsTab(body, st, re, d) {
   }
 }
 
+function investCard(body, inv, st) {
+  const monthTotal = inv.reduce((a, t) => a + t.amount, 0);
+  const allTime = DB.txns.filter(isInvest).reduce((a, t) => a + t.amount, 0);
+  const byAsset = {};
+  DB.txns.filter(isInvest).forEach(t => { const c = t.category || 'Other'; byAsset[c] = (byAsset[c] || 0) + t.amount; });
+
+  const card = h('div', { class: 'card', style: { marginBottom: '14px' } });
+  card.append(h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' } },
+    h('h3', { text: 'Investments', style: { margin: 0 } }),
+    h('span', { class: 'tiny', text: 'kept out of your spending totals' }),
+    h('div', { class: 'spacer' }),
+    h('button', { class: 'btn primary sm', html: `${icon('plus', 13)} Investment`,
+      onclick: () => editInvest({ date: st.month === monthKey(today()) ? today() : st.month + '-01' }) })));
+
+  const tiles = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', margin: '10px 0' } });
+  tiles.append(
+    h('div', { class: 'stat', html: `<div class="k">This month</div><div class="v">${esc(money(monthTotal))}</div><div class="d">${inv.length} entr${inv.length === 1 ? 'y' : 'ies'}</div>` }),
+    h('div', { class: 'stat', html: `<div class="k">Invested so far</div><div class="v">${esc(money(allTime))}</div><div class="d">all time</div>` }));
+  Object.entries(byAsset).sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(([k, v]) =>
+    tiles.append(h('div', { class: 'stat', html: `<div class="k">${esc(k)}</div><div class="v">${esc(money(v))}</div><div class="d">${allTime ? Math.round(v / allTime * 100) : 0}% of the pot</div>` })));
+  card.append(tiles);
+
+  if (!inv.length) card.append(h('div', { class: 'tiny', text: 'Nothing invested this month yet.' }));
+  inv.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(t => {
+    const row = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: '13px' } });
+    row.append(h('span', { class: 'tiny mono', text: fmtDate(t.date) }),
+      h('strong', { text: t.category || 'Other' }),
+      h('span', { class: 'tiny', text: (t.reason || '').slice(0, 60) }),
+      h('span', { class: 'spacer' }),
+      h('span', { class: 'mono', text: money(t.amount) }),
+      h('button', { class: 'btn ghost sm', html: icon('edit', 12), onclick: () => editInvest(t) }),
+      h('button', { class: 'btn ghost sm danger', html: icon('trash', 12), onclick: () => deleteTxns([t.id]) }));
+    card.append(row);
+  });
+  body.append(card);
+}
+
 /* ---------- deleting, one or many ---------- */
 async function deleteTxns(ids, quiet) {
   const chosen = DB.txns.filter(t => ids.includes(t.id));
@@ -2834,6 +2928,38 @@ async function recategorise(ids) {
   chosen.forEach(t => { t.category = o.category; if (isIncome(t)) t.source = o.category; });
   commit();
   toast(`Moved ${chosen.length} to ${o.category}`, 'check');
+}
+
+function manageCats() {
+  const body = h('div', {});
+  const list = h('div', { style: { marginBottom: '14px' } });
+  const draw = () => {
+    list.innerHTML = '';
+    expenseCats().forEach(c => {
+      const inUse = DB.txns.some(t => isExpense(t) && t.category === c);
+      const row = h('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--border)' } });
+      row.append(
+        h('i', { style: { width: '10px', height: '10px', borderRadius: '3px', background: catColor(c), flex: '0 0 auto' } }),
+        h('span', { text: c, style: { flex: '1', fontSize: '13px' } }),
+        inUse ? h('span', { class: 'tiny', text: 'in use' }) : null,
+        h('button', { class: 'btn ghost sm', html: icon('trash', 12),
+          style: { opacity: inUse ? .35 : 1, pointerEvents: inUse ? 'none' : 'auto' },
+          onclick: () => { DB.cats = expenseCats().filter(x => x !== c); save(); draw(); refresh(); } }));
+      list.append(row);
+    });
+  };
+  draw();
+  const inp = h('input', { class: 'inp', placeholder: 'Add a category and press Enter' });
+  inp.onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    const v = inp.value.trim(); if (!v) return;
+    if (!DB.cats || !DB.cats.length) DB.cats = EXPENSE_CATS.slice();
+    if (!DB.cats.includes(v)) DB.cats.push(v);
+    inp.value = ''; save(); draw(); refresh();
+  };
+  body.append(list, inp);
+  modal({ title: 'Expense categories', bodyNode: body,
+    footNode: h('button', { class: 'btn primary', text: 'Done', onclick: closeModal }) });
 }
 
 function manageIncomeCats() {
@@ -2874,7 +3000,7 @@ function entriesTab(body, st, re, d) {
   st.filter = st.filter || 'all';
   st.picked = st.picked || new Set();
 
-  const list = mt.filter(t => st.filter === 'all' || (st.filter === 'income') === isIncome(t))
+  const list = mt.filter(t => st.filter === 'all' || (st.filter === 'income' ? isIncome(t) : isExpense(t)))
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const visible = new Set(list.map(t => t.id));
   [...st.picked].forEach(id => { if (!visible.has(id)) st.picked.delete(id); });
@@ -2943,7 +3069,7 @@ function entriesTab(body, st, re, d) {
 
     const td = h('td', { style: { whiteSpace: 'nowrap' } });
     td.append(
-      h('button', { class: 'btn ghost sm', html: icon('edit', 13), title: 'Edit', onclick: () => income ? editIncome(t) : editExpense(t) }),
+      h('button', { class: 'btn ghost sm', html: icon('edit', 13), title: 'Edit', onclick: () => editTxn(t) }),
       h('button', { class: 'btn ghost sm danger', html: icon('trash', 13), title: 'Delete', onclick: () => deleteTxns([t.id]) }));
     tr.append(td);
     tb.append(tr);
@@ -2957,7 +3083,7 @@ function entriesTab(body, st, re, d) {
 }
 
 /* kept so older callers (Spotlight) still work */
-const editTxn = t => (t && isIncome(t)) ? editIncome(t) : editExpense(t);
+const editTxn = t => !t ? editExpense(t) : isIncome(t) ? editIncome(t) : isInvest(t) ? editInvest(t) : editExpense(t);
 </script>
 <script>
 /* ============================================================
@@ -3681,6 +3807,127 @@ function courseDetail(body, c, re, st) {
   nc.append(ta);
   body.append(nc);
 }
+</script>
+<script>
+/* ============================================================
+   GOALS — this week, this month, this year
+
+   Three horizons side by side, so the week can be checked against
+   the year it is supposed to be serving.
+   ============================================================ */
+
+const SCOPES = [
+  { k: 'week', label: 'This week', c: 'var(--accent)' },
+  { k: 'month', label: 'This month', c: 'var(--plum)' },
+  { k: 'year', label: 'This year', c: 'var(--s3)' },
+];
+
+function weekStartOf(d) {
+  const dt = fromYmd(d), ws = DB.settings.weekStart || 0;
+  return addDays(d, -(((dt.getDay() - ws) + 7) % 7));
+}
+function periodKey(scope, off) {
+  const t = today();
+  if (scope === 'week') return weekStartOf(addDays(t, (off || 0) * 7));
+  if (scope === 'month') { const d = fromYmd(t); d.setDate(1); d.setMonth(d.getMonth() + (off || 0)); return ymd(d).slice(0, 7); }
+  return String(fromYmd(t).getFullYear() + (off || 0));
+}
+function periodLabel(scope, key) {
+  if (scope === 'week') {
+    const end = addDays(key, 6), a = fromYmd(key), b = fromYmd(end);
+    return `${MON[a.getMonth()]} ${a.getDate()} – ${MON[b.getMonth()]} ${b.getDate()}`;
+  }
+  if (scope === 'month') return `${MONTHS[+key.slice(5, 7) - 1]} ${key.slice(0, 4)}`;
+  return key;
+}
+const goalsIn = (scope, key) => DB.goals.filter(g => g.scope === scope && g.period === key);
+
+async function editGoal(g, scope, key) {
+  const isNew = !g.id;
+  const out = await formModal(isNew ? 'New goal' : 'Edit goal', [
+    { k: 'title', label: 'Goal', required: true, placeholder: 'What has to be true by the end of it?' },
+    { k: 'why', label: 'Why this one', type: 'textarea', rows: 2, placeholder: 'Optional — but it helps on the bad days.' },
+    { type: 'row', fields: [
+      { k: 'scope', label: 'Horizon', type: 'select', options: SCOPES.map(s => [s.k, s.label]) },
+      { k: 'period', label: 'Period', hint: 'week = its Monday/Sunday date, month = 2026-08, year = 2026' }] },
+  ], { scope: scope || 'week', period: key || periodKey(scope || 'week', 0), ...g }, {
+    onDelete: isNew ? null : async () => { DB.goals = DB.goals.filter(x => x.id !== g.id); commit(); toast('Goal deleted', 'trash'); }
+  });
+  if (!out) return;
+  if (isNew) DB.goals.push({ id: uid(), done: false, createdAt: today(), ...out });
+  else Object.assign(DB.goals.find(x => x.id === g.id), out);
+  commit();
+}
+
+function goalColumn(scope, st, re) {
+  const s = SCOPES.find(x => x.k === scope);
+  st.off ||= { week: 0, month: 0, year: 0 };
+  const key = periodKey(scope, st.off[scope]);
+  const list = goalsIn(scope, key);
+  const done = list.filter(g => g.done).length;
+  const pct = list.length ? Math.round(done / list.length * 100) : 0;
+
+  const card = h('div', { class: 'card', style: { display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '260px' } });
+  const head = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+  head.append(h('h3', { text: s.label, style: { margin: 0, fontSize: '14px', fontWeight: 700, color: s.c } }), h('div', { class: 'spacer' }),
+    h('button', { class: 'btn ghost sm', html: icon('left', 13), onclick: () => { st.off[scope]--; re(); }, title: 'Earlier' }),
+    h('button', { class: 'btn ghost sm', html: icon('right', 13), onclick: () => { st.off[scope]++; re(); }, title: 'Later' }));
+  card.append(head);
+  card.append(h('div', { class: 'tiny', text: periodLabel(scope, key) + (st.off[scope] ? '' : ' · now') }));
+
+  const track = h('div', { style: { height: '7px', borderRadius: '99px', background: 'var(--line)', overflow: 'hidden' } });
+  track.append(h('div', { style: { height: '100%', width: pct + '%', background: s.c, transition: 'width .3s' } }));
+  card.append(track);
+  card.append(h('div', { class: 'tiny', text: list.length ? `${done} of ${list.length} done · ${pct}%` : 'Nothing set yet' }));
+
+  const box = h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', gap: '2px' } });
+  list.slice().sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0)).forEach(g => {
+    const row = h('div', { class: 'task' + (g.done ? ' done' : '') });
+    const cb = h('button', { class: 'cbox' + (g.done ? ' on' : ''), html: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>`, 'aria-label': 'Toggle' });
+    cb.onclick = () => { g.done = !g.done; if (g.done) toast('One goal down', 'check'); commit(); };
+    const mid = h('div', { style: { flex: '1', minWidth: 0, cursor: 'pointer' }, onclick: () => editGoal(g) });
+    mid.append(h('div', { class: 'ttl', text: g.title }));
+    if (g.why) mid.append(h('div', { class: 'meta' }, h('span', { class: 'tiny', text: g.why })));
+    row.append(cb, mid);
+    box.append(row);
+  });
+  card.append(box);
+
+  const qa = h('div', { class: 'quickadd', style: { padding: '0' } });
+  const inp = h('input', { class: 'inp', placeholder: 'Add a goal…' });
+  const add = () => {
+    const v = inp.value.trim(); if (!v) return;
+    DB.goals.push({ id: uid(), scope, period: key, title: v, why: '', done: false, createdAt: today() });
+    inp.value = ''; commit(); toast('Goal added', 'check');
+  };
+  inp.onkeydown = e => { if (e.key === 'Enter') add(); };
+  qa.append(inp, h('button', { class: 'btn primary', html: icon('plus', 15), onclick: add, title: 'Add' }));
+  card.append(qa);
+  return card;
+}
+
+const AppGoals = {
+  id: 'goals', name: 'Goals', icon: 'pin', color: '#6b4ea8', w: 1000, h: 660,
+  render(root, re, st) {
+    DB.goals ||= [];
+    const app = h('div', { class: 'app' });
+    const head = h('div', { class: 'app-head' });
+    head.append(h('h2', { text: 'Goals' }), h('div', { class: 'spacer' }),
+      h('button', { class: 'btn primary sm', html: `${icon('plus', 14)} Goal`, onclick: () => editGoal({}, 'week') }));
+    app.append(head);
+
+    const body = h('div', { class: 'app-body' });
+    const openW = goalsIn('week', periodKey('week', 0)).filter(g => !g.done).length;
+    const openY = goalsIn('year', periodKey('year', 0)).filter(g => !g.done).length;
+    body.append(h('div', { class: 'tiny', style: { marginBottom: '12px' },
+      text: openW ? `${openW} thing${openW === 1 ? '' : 's'} left this week${openY ? ` · ${openY} still open for the year` : ''}` : 'The week is clear. Set the next one.' }));
+
+    const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', alignItems: 'start' } });
+    SCOPES.forEach(s => grid.append(goalColumn(s.k, st, re)));
+    body.append(grid);
+    app.append(body); root.append(app);
+  }
+};
 </script>
 <script>
 /* ============================================================
@@ -4436,7 +4683,7 @@ function startGoogleLoop() {
 /* ============================================================
    REGISTRY · SPOTLIGHT · BOOT
    ============================================================ */
-const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppNotes, AppHabits, AppFocus,
+const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppNotes, AppHabits, AppFocus,
   AppFinance, AppCourses, AppTrips,
   Object.assign({ sep: true }, AppSettings)];
 
