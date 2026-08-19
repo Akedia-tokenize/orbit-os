@@ -5870,7 +5870,8 @@ AppGoals.render=function(root,re,st){
       const top=h('div',{class:'goal-checklist-head'},h('strong',{text:`Checklist · ${ms.filter(m=>m.done).length}/${ms.length}`}),h('span',{class:'tiny',text:`${pct}%`})); box.append(top);
       ms.forEach((m,i)=>{
         const row=h('label',{class:'goal-check-row '+(m.done?'done':'')});
-        const cb=h('input',{class:'goal-check-input',type:'checkbox'}); cb.checked=!!m.done; cb.onchange=()=>toggleChecklistItem(g.id,m.id);
+        row.onclick=e=>{e.stopPropagation();};
+        const cb=h('input',{class:'goal-check-input',type:'checkbox'}); cb.checked=!!m.done; cb.onchange=e=>{e.stopPropagation(); toggleChecklistItem(g.id,m.id);};
         row.append(cb,h('span',{class:'goal-check-mark',text:m.done?'✓':''}),h('span',{text:m.title})); box.append(row);
       });
       c.append(box);
@@ -5904,7 +5905,10 @@ AppGoals.render=function(root,re,st){
       reRenderGoals=re||(()=>AppGoals.render(root,re,st));
       const app=h('div',{class:'app goal-app'}), head=h('div',{class:'app-head'});
       head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Goals → checklist → progress → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',text:'⚡ Challenge',onclick:editChallengeV8}),h('button',{class:'btn primary sm',text:'+ Goal',onclick:()=>editGoalV9({},'week')}));
-      app.append(head); const body=h('div',{class:'app-body'}); body.append(challengeCardSafe());
+      app.append(head); const body=h('div',{class:'app-body'});
+      const challengeHeader=h('div',{class:'section-header challenge-section-header'});
+      challengeHeader.append(h('div',{},h('h3',{text:'Challenges'}),h('div',{class:'sub',text:'Track your monthly challenge, dates, progress and evidence.'})),h('div',{class:'spacer'}),h('button',{class:'btn primary sm',text:'+ New challenge',onclick:editChallengeV8}));
+      body.append(challengeHeader,challengeCardSafe());
       const controls=h('div',{class:'goal-controls'}),scopeBox=h('div',{class:'seg'});
       [['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']].forEach(([k,l])=>scopeBox.append(h('button',{class:st.scope===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));
       controls.append(scopeBox);
@@ -5955,7 +5959,7 @@ AppGoals.render=function(root,re,st){
     .goal-check-row.done .goal-check-mark{background:var(--accent);border-color:var(--accent);color:#fff}
     .goal-checklist-empty{margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:12px}
     .goal-card-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-    .season-empty{padding:18px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);margin-top:10px}
+    .challenge-section-header{display:flex;align-items:center;gap:12px;margin:4px 0 10px;padding:2px 2px 0}.challenge-section-header h3{margin:0;font-size:18px}.challenge-section-header .sub{margin-top:3px}.season-empty{padding:18px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);margin-top:10px}
   `; document.head.appendChild(style);
 })();
 </script>
