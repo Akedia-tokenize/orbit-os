@@ -870,6 +870,12 @@ html[data-theme="light"] .vision-hero::before{opacity:.20}
   -webkit-text-fill-color:currentColor;
 }
 </style>
+
+<style id="task-pinned-top-one-thing">
+.task-section-label{display:flex;align-items:center;gap:8px;padding:8px 4px 6px;color:var(--text)}
+.task-section-label strong{font-size:12px}
+.task-section-divider{height:1px;background:var(--border);margin:10px 0}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -1985,6 +1991,7 @@ const PRI = [
   { v: 1, name: 'Low', c: 'var(--s4)' },
   { v: 2, name: 'Medium', c: 'var(--warn)' },
   { v: 3, name: 'High', c: 'var(--crit)' },
+  { v: 4, name: 'The One Thing', c: 'var(--accent)' },
 ];
 
 /* ---------- a task with a due date also lives on the calendar ---------- */
@@ -2137,13 +2144,19 @@ function taskRow(t, re) {
   const mid = h('div', { style: { flex: '1', minWidth: 0, cursor: 'pointer' }, onclick: () => editTask(t) });
   mid.append(h('div', { class: 'ttl', text: t.title }));
   const meta = h('div', { class: 'meta' });
-  if (t.pri) meta.append(h('i', { class: 'pri', style: { background: PRI[t.pri].c }, title: PRI[t.pri].name + ' priority' }));
+  if (t.pri) {
+    meta.append(h('i', { class: 'pri', style: { background: PRI[t.pri].c }, title: PRI[t.pri].name + ' priority' }));
+    if (Number(t.pri) === 4) meta.append(h('span',{class:'chip',style:{color:'var(--accent)',borderColor:'color-mix(in srgb,var(--accent) 35%,var(--border))'},text:'THE ONE THING'}));
+  }
   if (t.due) meta.append(h('span', { class: 'due ' + dueClass(t), text: relDay(t.due) }));
   if (p) meta.append(h('span', { class: 'chip', html: `<i class="dot" style="background:${p.color}"></i>${esc(p.name)}` }));
   if (t.notDone) meta.append(h('span', { class: 'chip', style: { color: 'var(--crit)', borderColor: 'color-mix(in srgb,var(--crit) 35%,var(--border))' }, text: 'Not done' }));
   if (t.notes) meta.append(h('span', { class: 'tiny', html: icon('notes', 12) }));
   if (meta.children.length) mid.append(meta);
   const actions = h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', flex: '0 0 auto' } });
+  const pinBtn = h('button', { class: 'btn ghost sm', text: t.pinned ? '📌 Pinned' : '📍 Pin', title: t.pinned ? 'Unpin task' : 'Pin task' });
+  pinBtn.onclick = (e) => { e.stopPropagation(); t.pinned = !t.pinned; commit(); re(); };
+  actions.append(pinBtn);
   if (!t.done && !t.notDone) {
     const skip = h('button', { class: 'btn ghost sm', text: 'Didn’t do' });
     skip.onclick = async (e) => {
@@ -2279,7 +2292,8 @@ const AppTasks = {
     else if (st.filter.startsWith('p:')) { const p = projOf(st.filter.slice(2)); list = list.filter(t => t.projectId === st.filter.slice(2) && !t.notDone); heading = p ? p.name : 'Project'; }
     const doneCount = list.filter(t => t.done).length;
     if (!st.showDone && st.filter !== 'notdone') list = list.filter(t => !t.done && !t.notDone);
-    list.sort(taskSort);
+    list = list.filter(t => !t.notDone);
+    list.sort((a,b) => Number(!!b.pinned) - Number(!!a.pinned) || taskSort(a,b));
 
     const bar = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px 6px' } });
     bar.append(h('h2', { text: heading, style: { margin: 0, fontSize: '15px', fontWeight: 700 } }),
@@ -2289,7 +2303,14 @@ const AppTasks = {
 
     const box = h('div', { style: { flex: '1', overflow: 'auto', padding: '4px 10px 16px' } });
     if (!list.length) box.append(h('div', { class: 'empty', html: `<div class="big">${icon('check', 34)}</div><div>Nothing here. Enjoy it.</div>` }));
-    list.forEach(t => box.append(taskRow(t, re)));
+    const pinned = list.filter(t => t.pinned);
+    const rest = list.filter(t => !t.pinned);
+    if (pinned.length) {
+      box.append(h('div',{class:'task-section-label'},h('span',{text:'📌'}),h('strong',{text:'Pinned'}),h('span',{class:'tiny',text:`${pinned.length}`})));
+      pinned.forEach(t => box.append(taskRow(t, re)));
+      if (rest.length) box.append(h('div',{class:'task-section-divider'}));
+    }
+    rest.forEach(t => box.append(taskRow(t, re)));
     main.append(box);
 
     split.append(side, main);
@@ -3831,6 +3852,7 @@ async function editPillar(p) {
       { k: 'target', label: 'Target', type: 'number', step: 'any', placeholder: '10000' },
       { k: 'unit', label: 'Unit', placeholder: 'kg, €, books…', hint: 'Ignored for hour goals.' }] },
     { k: 'color', label: 'Colour', type: 'color' },
+    { k: 'priority', label: 'Priority', type: 'select', options: [['normal','Normal'],['high','High'],['one','The One Thing']] },
   ], { goalType: 'hours', target: 10000, color: PILLAR_COLORS[v.pillars.length % PILLAR_COLORS.length], startDate: p.startDate||ORBIT_DEFAULT_DATE, endDate: p.endDate||ORBIT_DEFAULT_DATE, pinned: !!p.pinned, ...p }, {
     onDelete: isNew ? null : async () => {
       if (await confirmModal('Delete pillar?', `"${p.name}", its milestones and every hour you logged against it will be removed.`)) {
@@ -4235,6 +4257,7 @@ async function editCourse(c) {
     { type: 'row', fields: [
       { k: 'cost', label: 'Enrolment cost', type: 'number', step: '0.01' },
       { k: 'status', label: 'Status', type: 'select', options: COURSE_STATES.map(s => [s.v, s.label]) }] },
+    { k: 'priority', label: 'Priority', type: 'select', options: [['normal','Normal'],['high','High'],['one','The One Thing']] },
     { k: 'color', label: 'Colour', type: 'color' },
     { k: 'link', label: 'Link', placeholder: 'Optional' },
   ], { start: ORBIT_DEFAULT_DATE, end: ORBIT_DEFAULT_DATE, status: 'planned', color: defaultColor, ...c }, {
@@ -5614,6 +5637,7 @@ const AppChallenges = {
         {type:'row',fields:[{k:'startDate',label:'Start date',type:'date',required:true},{k:'endDate',label:'End date',type:'date',required:true}]},
         {k:'why',label:'Why this challenge?',type:'textarea',rows:2},
         {k:'metric',label:'Success metric'},
+        {k:'priority',label:'Priority',type:'select',options:[['normal','Normal'],['high','High'],['one','The One Thing']]},
         {type:'row',fields:[{k:'target',label:'Target',type:'number',step:'any'},{k:'unit',label:'Unit'}]},
         {k:'rules',label:'Rules / boundaries',type:'textarea',rows:2},
         {k:'notes',label:'Notes',type:'textarea',rows:2}
@@ -5790,7 +5814,7 @@ async function editGoalV5(g={},scope){
     {k:'measurement',label:'How is success measured?',type:'select',options:[['hours','Time / Hours'],['milestone','Milestones'],['output','Output / Deliverables'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['binary','Binary outcome'],['consistency','Consistency / Frequency']]},
     {type:'row',fields:[{k:'kpi',label:'KPI name',placeholder:'e.g. Mock score, projects shipped'},{k:'unit',label:'Unit',placeholder:'hours, %, projects…'}]},
     {type:'row',fields:[{k:'current',label:'Current value',type:'number',step:'any'},{k:'target',label:'Target value',type:'number',step:'any'}]},
-    {type:'row',fields:[{k:'priority',label:'Priority',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low']]},{k:'color',label:'Highlight colour',type:'color'}]},
+    {type:'row',fields:[{k:'priority',label:'Priority',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low'],['one','The One Thing']]},{k:'color',label:'Highlight colour',type:'color'}]},
     {k:'why',label:'Why this matters',type:'textarea',rows:2},
     {k:'definition',label:'Definition of Done',type:'textarea',rows:2,placeholder:'What evidence proves this is complete?'},
     {k:'nextAction',label:'Next action',placeholder:'The smallest concrete next move'},
@@ -5945,7 +5969,7 @@ async function editGoalV8(g={},scope){
   {k:'measurement',label:'How is success measured?',type:'select',options:[['hours','Time / Hours'],['milestone','Milestones'],['output','Output / Deliverables'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['binary','Binary outcome'],['consistency','Consistency / Frequency']]},
   {type:'row',fields:[{k:'kpi',label:'KPI name'},{k:'unit',label:'Unit'}]},
   {type:'row',fields:[{k:'current',label:'Current value',type:'number',step:'any'},{k:'target',label:'Target value',type:'number',step:'any'}]},
-  {type:'row',fields:[{k:'priority',label:'Priority',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low']]},{k:'color',label:'Highlight colour',type:'color'}]},
+  {type:'row',fields:[{k:'priority',label:'Priority',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low'],['one','The One Thing']]},{k:'color',label:'Highlight colour',type:'color'}]},
   {k:'milestoneText',label:'Stages / milestones',type:'textarea',rows:5,placeholder:'One stage per line. Each stage becomes a trackable step.'},
   {k:'why',label:'Why this matters',type:'textarea',rows:2},
   {k:'definition',label:'Definition of Done',type:'textarea',rows:2},
@@ -6161,7 +6185,7 @@ AppGoals.render=function(root,re,st){
       {k:'title',label:'Goal',required:true},
       {k:'sticker',label:'Sticker',type:'select',options:[['💼','💼'],['💰','💰'],['❤️','❤️'],['👨‍👩‍👧‍👦','👨‍👩‍👧‍👦'],['🏃','🏃'],['🧠','🧠'],['📚','📚'],['🎨','🎨'],['🚀','🚀'],['🌱','🌱'],['✨','✨'],['😌','😌'],['🛌','🛌'],['🍎','🍎'],['🥗','🥗'],['🧘','🧘'],['🤝','🤝'],['💬','💬'],['🏠','🏠'],['✈️','✈️'],['🎮','🎮'],['🎵','🎵'],['📅','📅'],['🧳','🧳'],['🌍','🌍'],['☀️','☀️'],['🌿','🌿'],['🙏','🙏'],['🛍️','🛍️'],['💡','💡'],['⚡','⚡'],['🏆','🏆']]},
       {k:'category',label:'Category',type:'select',options:cats().map(x=>[x,x])},
-      {k:'priority',label:'Importance',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low']]},
+      {k:'priority',label:'Importance',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low'],['one','The One Thing']]},
       {k:'titleHighlight',label:'Title highlight',type:'select',options:[
         ['','No highlight'],['#fde68a','Butter yellow'],['#fecaca','Soft red'],['#fed7aa','Peach'],['#bbf7d0','Mint'],
         ['#bfdbfe','Sky blue'],['#ddd6fe','Lavender'],['#fbcfe8','Rose'],['#bae6fd','Ice blue'],['#d9f99d','Lime'],
