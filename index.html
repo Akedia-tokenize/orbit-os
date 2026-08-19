@@ -4381,7 +4381,27 @@ function courseList(body, re, st) {
     return;
   }
 
-  const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', marginTop: '14px' } });
+  
+    const courseNotesPanel = (c) => {
+      const wrap = h('div',{class:'course-notes-panel'});
+      const titleRow = h('div',{class:'course-notes-head'},
+        h('div',{class:'course-notes-title'},h('span',{text:'📝'}),h('strong',{text:'Course notes'})),
+        h('button',{class:'btn ghost sm',text:'Edit notes',onclick:async(e)=>{
+          e.stopPropagation();
+          const out = await formModal('Course notes',[
+            {k:'notes',label:'Notes',type:'textarea',rows:14,placeholder:'Write notes, reflections, questions, links, ideas…'}
+          ],{notes:c.notes||''});
+          if(out){c.notes=out.notes||'';commit();}
+        }})
+      );
+      const body = h('div',{class:'course-notes-body',text:c.notes||'Add notes for this course…'});
+      if(!c.notes) body.classList.add('is-empty');
+      body.dir = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(c.notes||'') ? 'rtl' : 'ltr';
+      wrap.append(titleRow,body);
+      return wrap;
+    };
+
+const grid = h('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', marginTop: '14px' } });
   list.forEach(c => {
     const s = stateOf(c.status);
     const courseColor = c.color || 'var(--c4)';
@@ -6483,3 +6503,62 @@ AppGoals.render=function(root,re,st){
 
 </body>
 </html>
+<script id="orbit-persian-direction">
+(function(){
+  function applyPersianDirection(el){
+    if(!el) return;
+    const value=String(el.value||el.textContent||'');
+    const isFa=/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(value);
+    el.dir=isFa?'rtl':'ltr';
+    el.style.direction=isFa?'rtl':'ltr';
+    el.style.textAlign=isFa?'right':'left';
+    if(isFa) el.classList.add('persian-text'); else el.classList.remove('persian-text');
+  }
+  function scan(){
+    document.querySelectorAll('textarea,input[type="text"],input:not([type]),.course-notes-body').forEach(el=>{
+      if(!el.dataset.persianBound){
+        el.dataset.persianBound='1';
+        el.addEventListener('input',()=>applyPersianDirection(el));
+        el.addEventListener('change',()=>applyPersianDirection(el));
+      }
+      applyPersianDirection(el);
+    });
+  }
+  const mo=new MutationObserver(scan);
+  mo.observe(document.body,{subtree:true,childList:true});
+  setTimeout(scan,50);
+})();
+</script>
+<style id="orbit-vazir-course-notes">
+@font-face{
+  font-family:'Vazir';
+  src:local('Vazir'),local('Vazirmatn'),local('Vazir FD');
+  font-style:normal;
+  font-weight:100 900;
+}
+:root{--font-fa:'Vazir','Vazirmatn','Tahoma','Arial',sans-serif;}
+body{font-family:var(--font-fa),system-ui,sans-serif;}
+.persian-text,
+.course-notes-body[dir="rtl"]{
+  font-family:var(--font-fa)!important;
+  direction:rtl!important;
+  text-align:right!important;
+}
+.course-notes-panel{
+  margin-top:12px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--surface-2) 94%,transparent),var(--surface));
+}
+.course-notes-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 12px;border-bottom:1px solid var(--border);
+}
+.course-notes-title{display:flex;align-items:center;gap:7px;font-size:12px;}
+.course-notes-body{
+  min-height:92px;padding:12px;white-space:pre-wrap;
+  line-height:1.75;font-size:12px;color:var(--text);
+}
+.course-notes-body.is-empty{color:var(--muted);}
+</style>
