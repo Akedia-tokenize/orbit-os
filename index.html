@@ -6151,28 +6151,7 @@ AppGoals.render=function(root,re,st){
     return i<0 ? 9999 : i;
   }
   function quarterGoalDate(g){ return String(g.deadline||g.endDate||g.startDate||g.createdAt||'9999-12-31').slice(0,10); }
-  function quarterGoalCard(g){
-    const c=quarterGoalCard(g);
-    const actions=h('div',{class:'goal-quarter-actions'});
-    actions.append(h('button',{class:'btn ghost sm',type:'button',text:'↗ Add to another section',onclick:async(e)=>{
-      e.stopPropagation();
-      const out=await formModal('Add this quarterly goal to another section',[
-        {k:'scope',label:'Section / horizon',type:'select',options:[['week','Weekly'],['month','Monthly'],['year','Yearly'],['long','Long-term']]},
-        {k:'copy',label:'Create a copy',type:'select',options:[['yes','Yes — keep the Quarterly goal'],['no','No — move it out of Quarterly']]}
-      ],{scope:'month',copy:'yes'});
-      if(!out)return;
-      const target=out.scope;
-      if(out.copy==='no'){
-        g.scope=target;
-        commit();
-      }else{
-        const cp=JSON.parse(JSON.stringify(g)); cp.id=uid(); cp.scope=target; cp.createdAt=today();
-        DB.goals.push(cp); commit();
-      }
-      toast(out.copy==='no'?'Goal moved':'Goal copied to '+target,'check');
-    }}));
-    c.append(actions); return c;
-  }
+  // Removed duplicate recursive quarterGoalCard wrapper. The implementation above is the single source of truth.
   function renderQuarterGoals(root,re,st){
     ensureGoalsSafe();
     const app=h('div',{class:'app goal-app'});
