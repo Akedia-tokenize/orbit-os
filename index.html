@@ -6295,5 +6295,37 @@ AppGoals.render=function(root,re,st){
 })();
 </script>
 
+
+<script>
+/* HARD STABLE GOALS RENDER — final override */
+(function(){
+  function safeGoals(){
+    window.DB=window.DB||{}; DB.goals=Array.isArray(DB.goals)?DB.goals:[]; DB.projects=Array.isArray(DB.projects)?DB.projects:[];
+    DB.goals.forEach(g=>{g.scope=g.scope==='day'?'week':(g.scope||'week');g.category=g.category||'General';g.milestones=Array.isArray(g.milestones)?g.milestones:[];g.reviewDates=Array.isArray(g.reviewDates)?g.reviewDates:[];});
+    return DB.goals;
+  }
+  function pct(g){let m=g.milestones||[];return m.length?Math.round(m.filter(x=>x.done).length/m.length*100):(g.done?100:0)}
+  function season(g){let d=String(g.deadline||g.endDate||g.startDate||today()).slice(0,10),a=d.split('-').map(Number),m=a[1]||1;try{if(typeof gregorianToJalali==='function')m=Number(gregorianToJalali(a[0],a[1],a[2])[1])||m}catch(e){}return m<=3?'spring':m<=6?'summer':m<=9?'autumn':'winter'}
+  function category(g){return g.category||'General'}
+  function card(g){
+    const c=h('div',{class:'goal-v5'}); c.onclick=e=>{if(!e.target.closest('button,input,label')){if(window.editGoalV8)window.editGoalV8(g,g.scope)}};
+    c.append(h('div',{class:'goal-sticker',text:window.goalSticker?goalSticker(g):'🎯'}),h('div',{class:'goal-head'},h('span',{class:'goal-dot'}),h('span',{class:'goal-cat',text:category(g)})),h('h3',{text:g.title||'Untitled goal'}));
+    const p=pct(g); c.append(h('div',{class:'goal-kpi'},h('span',{text:g.kpi||g.measurement||'Checklist'}),h('strong',{text:p+'% complete'})),h('div',{class:'goal-bar'},h('i',{style:{width:p+'%'}})));
+    const ms=g.milestones||[];
+    if(ms.length){const box=h('div',{class:'goal-checklist'});box.append(h('div',{class:'goal-checklist-head'},h('strong',{text:'Checklist · '+ms.filter(x=>x.done).length+'/'+ms.length}),h('span',{class:'tiny',text:p+'%'})));ms.forEach(m=>{const row=h('label',{class:'goal-check-row '+(m.done?'done':'')});row.onclick=e=>e.stopPropagation();const cb=h('input',{type:'checkbox',class:'goal-check-input'});cb.checked=!!m.done;cb.onchange=e=>{e.stopPropagation();m.done=cb.checked;m.completedAt=m.done?(window.today?today():''):'';g.done=ms.length>0&&ms.every(x=>x.done);if(window.commit)commit();render(c.parentElement.parentElement.parentElement,()=>{}, {scope:'quarter'});};row.append(cb,h('span',{class:'goal-check-mark',text:m.done?'✓':''}),h('span',{text:m.title}));box.append(row)});c.append(box)}
+    const a=h('div',{class:'goal-card-actions'});a.append(h('button',{class:'btn ghost sm',text:'Edit',onclick:e=>{e.stopPropagation();window.editGoalV8&&window.editGoalV8(g,g.scope)}}));c.append(a);return c;
+  }
+  function renderQuarter(root){
+    safeGoals(); const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Quarter'}),h('div',{class:'sub',text:'Quarterly goals only'})),h('div',{class:'spacer'}),h('button',{class:'btn primary sm',text:'+ Quarterly Goal',onclick:()=>window.editGoalV8&&window.editGoalV8({},'quarter')}));app.append(head);
+    const body=h('div',{class:'app-body'});const defs=[['spring','🌱','Spring','Farvardin → Khordad'],['summer','☀️','Summer','Tir → Shahrivar'],['autumn','🍂','Autumn','Mehr → Azar'],['winter','❄️','Winter','Dey → Esfand']];
+    defs.forEach(([key,ic,name,months])=>{const sec=h('section',{class:'goal-season'});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:ic}),h('div',{},h('div',{class:'goal-season-title',text:name}),h('div',{class:'goal-season-sub',text:months}))));const gs=DB.goals.filter(g=>g.scope==='quarter'&&season(g)===key).sort((a,b)=>category(a).localeCompare(category(b))||String(a.deadline||a.endDate||a.startDate||'9999').localeCompare(String(b.deadline||b.endDate||b.startDate||'9999')));let last='';let grid=null;gs.forEach(g=>{if(category(g)!==last){last=category(g);sec.append(h('div',{class:'goal-section-head'},h('h3',{text:last})));grid=h('div',{class:'goal-grid'});sec.append(grid)}grid.append(card(g))});if(!gs.length)sec.append(h('div',{class:'empty',text:'No quarterly goals yet.'}));body.append(sec)});app.append(body);root.innerHTML='';root.append(app);
+  }
+  function render(root,re,st){st=st||{};st.scope=st.scope||'quarter'; if(st.scope==='quarter'){renderQuarter(root);return;} safeGoals();
+    const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'})),h('div',{class:'spacer'}),h('button',{class:'btn primary sm',text:'+ Goal',onclick:()=>window.editGoalV8&&window.editGoalV8({},st.scope)}));app.append(head);const body=h('div',{class:'app-body'});const grid=h('div',{class:'goal-grid'});DB.goals.filter(g=>g.scope===st.scope).forEach(g=>grid.append(card(g)));body.append(grid);app.append(body);root.innerHTML='';root.append(app);
+  }
+  window.__stableGoalsRender=render;
+  window.AppGoals=window.AppGoals||{};window.AppGoals.render=render;
+})();
+</script>
 </body>
 </html>
