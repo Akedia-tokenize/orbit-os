@@ -946,6 +946,14 @@ input.persian-text,
 .rich-note-modal .rich-note-editable{min-height:320px}
 .rich-note-editable ul,.rich-note-editable ol{padding-inline-start:24px}
 .rich-note-editable blockquote{margin:10px 0;padding:8px 12px;border-left:3px solid var(--accent);background:var(--surface-3);border-radius:8px}
+.rich-note-select{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;padding:6px 7px;font:600 11px var(--font-en);cursor:pointer;max-width:120px}
+.rich-note-sep{width:1px;height:22px;background:var(--border);display:inline-block;margin:0 2px}
+.rich-note-color-wrap{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;padding:3px 5px;font-weight:700;cursor:pointer}
+.rich-note-color-wrap .rich-note-color{border:0;width:22px;height:22px;padding:0;background:transparent}
+.rich-note-editable h2,.rich-note-editable h3,.rich-note-editable h4{margin:14px 0 7px;line-height:1.25}
+.rich-note-editable p{margin:0 0 8px}
+.rich-note-editable a{color:var(--accent);text-decoration:underline}
+
 </style>
 </head>
 <body data-wall="aurora">
@@ -4315,6 +4323,13 @@ function pillarDetail(body, p, re, st) {
 }
 </script>
 <script>
+function richDir(html){const text=String(html||'').replace(/<[^>]*>/g,' ');return orbitDirection(text)}
+function sanitizeNoteHTML(v){const tmp=document.createElement('div');tmp.innerHTML=String(v||'');tmp.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(x=>x.remove());tmp.querySelectorAll('*').forEach(el=>{[...el.attributes].forEach(a=>{if(/^on/i.test(a.name))el.removeAttribute(a.name);if(a.name==='style'){const safe=a.value.split(';').map(x=>x.trim()).filter(x=>/^(text-align|font-weight|font-style|text-decoration|background-color|color|direction|font-size|font-family)\s*:/i.test(x)).join(';');if(safe)el.setAttribute('style',safe);else el.removeAttribute('style')}});if(el.tagName==='A'){const href=el.getAttribute('href')||'';if(!/^https?:\/\//i.test(href))el.removeAttribute('href');el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer')}});return tmp.innerHTML}
+function noteExec(editable,cmd,value=null){editable.focus();try{if(cmd==='createLink'){const url=prompt('Enter URL');if(url)document.execCommand(cmd,false,url)}else{document.execCommand(cmd,false,value)}}catch(e){}editable.dispatchEvent(new Event('input',{bubbles:true}))}
+function makeNoteToolbar(editable){const bar=h('div',{class:'rich-note-toolbar'});const btn=(label,cmd,title)=>h('button',{class:'rich-note-btn',type:'button',text:label,title,onclick:()=>noteExec(editable,cmd)});const select=(title,items,cmd)=>{const s=h('select',{class:'rich-note-select',title});items.forEach(([v,l])=>s.append(h('option',{value:v,text:l})));s.onchange=()=>{if(s.value)noteExec(editable,cmd,s.value);s.value=''};return s};bar.append(btn('↶','undo','Undo'),btn('↷','redo','Redo'),h('span',{class:'rich-note-sep'}),btn('B','bold','Bold'),btn('I','italic','Italic'),btn('U','underline','Underline'),btn('S','strikeThrough','Strikethrough'),h('span',{class:'rich-note-sep'}),select('Text style',[['','Style'],['p','Paragraph'],['h2','Heading 2'],['h3','Heading 3'],['h4','Heading 4']], 'formatBlock'),select('Font size',[['','Size'],['1','Small'],['3','Normal'],['5','Large'],['7','Huge']], 'fontSize'),h('span',{class:'rich-note-sep'}),btn('• List','insertUnorderedList','Bullet list'),btn('1. List','insertOrderedList','Numbered list'),h('button',{class:'rich-note-btn',type:'button',text:'❝',title:'Blockquote',onclick:()=>noteExec(editable,'formatBlock','blockquote')}),h('span',{class:'rich-note-sep'}),btn('←','justifyLeft','Align left'),btn('↔','justifyCenter','Center'),btn('→','justifyRight','Align right'),btn('≋','justifyFull','Justify'),h('span',{class:'rich-note-sep'}),h('label',{class:'rich-note-color-wrap',title:'Text color'},h('span',{text:'A'}),h('input',{type:'color',class:'rich-note-color',value:'#f4f1e8',onchange:e=>noteExec(editable,'foreColor',e.target.value)})),h('label',{class:'rich-note-color-wrap',title:'Highlight color'},h('span',{text:'▰'}),h('input',{type:'color',class:'rich-note-color',value:'#f4d03f',onchange:e=>noteExec(editable,'hiliteColor',e.target.value)})),h('span',{class:'rich-note-sep'}),btn('↗','createLink','Insert link'),btn('Tx','removeFormat','Clear formatting'));return bar}
+function createRichNoteEditor(initial,onChange){const wrap=h('div',{class:'rich-note-editor'});const editable=h('div',{class:'rich-note-editable',contenteditable:'true',spellcheck:'true'});editable.innerHTML=sanitizeNoteHTML(initial||'');editable.dir=richDir(initial||'');editable.classList.toggle('persian-text',editable.dir==='rtl');const emit=()=>{editable.dir=richDir(editable.innerHTML);editable.classList.toggle('persian-text',editable.dir==='rtl');onChange(sanitizeNoteHTML(editable.innerHTML))};editable.addEventListener('input',emit);editable.addEventListener('blur',emit);wrap.append(makeNoteToolbar(editable),editable);return wrap}
+async function richNoteModal(title,initial){return new Promise(resolve=>{const wrap=h('div',{class:'rich-note-modal'});let value=sanitizeNoteHTML(initial||'');const editor=createRichNoteEditor(value,v=>{value=v});wrap.append(editor);const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null)}}),h('button',{class:'btn primary',text:'Save note',onclick:()=>{closeModal();resolve(value)}}));modal({title,bodyNode:wrap,footNode:foot,wide:true})})}
+
 /* ============================================================
    COURSES — what you signed up for, why, and what it cost
 
@@ -4545,77 +4560,7 @@ function courseDetail(body, c, re, st) {
   body.append(rc);
 
 
-<script id="orbit-rich-note-tools">
-function richDir(html){
-  const text=String(html||'').replace(/<[^>]*>/g,' ');
-  return orbitDirection(text);
-}
-function sanitizeNoteHTML(v){
-  const tmp=document.createElement('div');
-  tmp.innerHTML=String(v||'');
-  tmp.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(x=>x.remove());
-  tmp.querySelectorAll('*').forEach(el=>{
-    [...el.attributes].forEach(a=>{
-      if(/^on/i.test(a.name)) el.removeAttribute(a.name);
-      if(a.name==='style'){
-        const safe=a.value.split(';').map(x=>x.trim()).filter(x=>/^(text-align|font-weight|font-style|text-decoration|background-color|color|direction|font-size)\s*:/i.test(x)).join(';');
-        if(safe) el.setAttribute('style',safe); else el.removeAttribute('style');
-      }
-    });
-  });
-  return tmp.innerHTML;
-}
-function makeNoteToolbar(editable){
-  const bar=h('div',{class:'rich-note-toolbar'});
-  const btn=(label,cmd,title)=>h('button',{class:'rich-note-btn',type:'button',text:label,title,onclick:()=>{editable.focus();document.execCommand(cmd,false,null);}});
-  bar.append(
-    btn('B','bold','Bold'),
-    btn('I','italic','Italic'),
-    btn('U','underline','Underline'),
-    btn('S','strikeThrough','Strikethrough'),
-    btn('H','hiliteColor','Highlight'),
-    btn('• List','insertUnorderedList','Bullet list'),
-    btn('1. List','insertOrderedList','Numbered list'),
-    btn('↞','justifyLeft','Align left'),
-    btn('↔','justifyCenter','Center'),
-    btn('↠','justifyRight','Align right'),
-    btn('↕','justifyFull','Justify'),
-    h('input',{type:'color',class:'rich-note-color',title:'Text color',value:'#ffffff',
-      onchange:(e)=>{editable.focus();document.execCommand('foreColor',false,e.target.value);}}),
-    h('input',{type:'color',class:'rich-note-color',title:'Highlight color',value:'#f4d03f',
-      onchange:(e)=>{editable.focus();document.execCommand('hiliteColor',false,e.target.value);}})
-  );
-  return bar;
-}
-function createRichNoteEditor(initial,onChange){
-  const wrap=h('div',{class:'rich-note-editor'});
-  const editable=h('div',{class:'rich-note-editable',contenteditable:'true'});
-  editable.innerHTML=sanitizeNoteHTML(initial||'');
-  editable.dir=richDir(initial||'');
-  editable.classList.toggle('persian-text',editable.dir==='rtl');
-  editable.addEventListener('input',()=>{
-    editable.dir=richDir(editable.innerHTML);
-    editable.classList.toggle('persian-text',editable.dir==='rtl');
-    onChange(sanitizeNoteHTML(editable.innerHTML));
-  });
-  editable.addEventListener('blur',()=>onChange(sanitizeNoteHTML(editable.innerHTML)));
-  wrap.append(makeNoteToolbar(editable),editable);
-  return wrap;
-}
-async function richNoteModal(title,initial){
-  return new Promise(resolve=>{
-    const wrap=h('div',{class:'rich-note-modal'});
-    let value=sanitizeNoteHTML(initial||'');
-    const editor=createRichNoteEditor(value,v=>{value=v;});
-    wrap.append(editor);
-    const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
-      h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null);}}),
-      h('button',{class:'btn primary',text:'Save',onclick:()=>{closeModal();resolve(value);}})
-    );
-    modal({title,bodyNode:wrap,footNode:foot,wide:true});
-  });
-}
-</script>
+
 
   /* General notes + structured session notes */
   c.sessions ||= [];
@@ -4627,17 +4572,8 @@ async function richNoteModal(title,initial){
     h('span',{class:'tiny',text:'Free-form notes'})
   );
   general.append(generalHead);
-  const generalTa = h('textarea', { class: 'inp', rows: 6, placeholder: 'General notes, ideas, questions, links, things you want to remember…' });
-  generalTa.value = c.notes || '';
-  generalTa.dir = orbitDirection(c.notes || '');
-  generalTa.classList.toggle('persian-text', generalTa.dir==='rtl');
-  generalTa.oninput = () => {
-    c.notes = generalTa.value;
-    generalTa.dir = orbitDirection(generalTa.value);
-    generalTa.classList.toggle('persian-text', generalTa.dir==='rtl');
-    save();
-  };
-  general.append(generalTa);
+  const generalEditor = createRichNoteEditor(c.notes || '', v => { c.notes = v; save(); });
+  general.append(generalEditor);
   body.append(general);
 
   const sessionsCard = h('div',{class:'card course-sessions-card',style:{marginTop:'14px'}});
