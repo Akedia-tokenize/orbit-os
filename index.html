@@ -5349,7 +5349,7 @@ const AppChallenges = {
     const logs = Array.isArray(c.progressLog) ? c.progressLog.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.time||'').localeCompare(String(a.time||''))) : [];
 
     const hero = h('div',{class:'challenge-hero'});
-    hero.append(h('div',{class:'challenge-orb'},icon('bolt',28,1.7)),
+    hero.append(h('div',{class:'challenge-orb',html:icon('bolt',28,1.7)}),
       h('div',{class:'challenge-copy'},
         h('div',{class:'eyebrow',text:`MONTHLY CHALLENGE · ${monthLabelGregorian(key)}`}),
         h('h2',{text:c.title||'Monthly challenge'}),
