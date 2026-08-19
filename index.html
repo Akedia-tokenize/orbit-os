@@ -5521,8 +5521,8 @@ function goalSticker(g){return g.sticker||({'Health':'💪','Learning':'📚','W
 function goalSeason(g){const base=goalDeadline(g)||g.startDate||today(); const a=String(base).split('-').map(Number); const j=gregorianToJalali(a[0],a[1],a[2]); const m=j[1]; if(m<=3)return {key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'}; if(m<=6)return {key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'}; if(m<=9)return {key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'}; return {key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'};}
 function goalCardV5(g){const pct=goalPct(g),d=goalDeadline(g),days=d?daysBetween(today(),d):null;const overdue=days!=null&&days<0&&!g.done;const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});c.onclick=e=>{if(e.target.closest('button'))return;editGoalV5(g)};c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker" title="Goal sticker">${goalSticker(g)}</div><div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}">${esc(g.priority||'Medium')}</span></div><h3>${esc(g.title)}</h3><div class="goal-kpi"><span>${esc(g.pillarId?(vision().pillars.find(p=>p.id===g.pillarId)?.name||'Pillar'):(g.kpi||g.measurement||'Outcome'))}</span><strong>${g.target!=null&&g.target!==''?`${g.current||0} / ${g.target} ${esc(g.unit||'')}`:(g.done?'Complete':'In progress')}</strong></div><div class="goal-bar"><i style="width:${pct}%"></i></div><div class="goal-foot"><span>${d?`${esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'}))}`:'No deadline'} </span><b class="${overdue?'overdue':''}">${overdue?'OVERDUE':days===0?'TODAY':days!=null?`${days}d left`:''}</b></div>${reviewBadges(g)?`<div class="review-row">${reviewBadges(g)}</div>`:''}`;return c;}
 AppGoals.render=function(root,re,st){ensureGoalModel();const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallenge}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV5({},'week')}));app.append(head);const body=h('div',{class:'app-body'});body.append(challengeCard(re));
-  const controls=h('div',{class:'goal-controls'}), scope=h('div',{class:'seg'}), scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
-  const list=DB.goals.filter(g=>(st.scope||'quarter')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}];const seasonGroups={};seasons.forEach(x=>seasonGroups[x.key]=[]);list.forEach(g=>seasonGroups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=seasonGroups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});const sh=h('div',{class:'goal-season-head'});sh.append(h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`}));sec.append(sh);const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV5(g)));sec.append(grid);});body.append(sec);});if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app);
+  const controls=h('div',{class:'goal-controls'}), scope=h('div',{class:'seg'}), scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
+  const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}];const seasonGroups={};seasons.forEach(x=>seasonGroups[x.key]=[]);list.forEach(g=>seasonGroups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=seasonGroups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});const sh=h('div',{class:'goal-season-head'});sh.append(h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`}));sec.append(sh);const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV5(g)));sec.append(grid);});body.append(sec);});if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app);
 };
 /* Pillars: dates + linked goals */
 const editPillarV5=editPillar;
@@ -5656,10 +5656,10 @@ function challengeCardV8(){
 AppFinance.render = (function(old){return function(root,re,st){old(root,re,st); const app=root.querySelector('.app'); if(!app)return; const head=app.querySelector('.app-head'); const seg=head&&head.querySelector('.seg'); if(seg && ![...seg.querySelectorAll('button')].some(b=>b.textContent.includes('Investments'))){const b=h('button',{class:st.tab==='investments'?'on':'',text:'Investments',onclick:()=>{st.tab='investments';re()}});seg.insertBefore(b,seg.lastElementChild);} if(st.tab==='investments'){const body=app.querySelector('.app-body'); if(body){body.innerHTML='';investmentPanelV8(body,st);}}};})(AppFinance.render);
 
 AppGoals.render=function(root,re,st){ensureGoalModel();const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → stages → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallengeV8}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV8({},'week')}));app.append(head);const body=h('div',{class:'app-body'});body.append(challengeCardV8());
- const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
- const list=DB.goals.filter(g=>(st.scope||'quarter')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
+ const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
+ const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
  const goalCard=g=>{const pct=goalStageProgress(g),d=goalDeadline(g),days=d?daysBetween(today(),d):null,c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});c.onclick=e=>{if(!e.target.closest('button'))editGoalV8(g)};c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker">${goalSticker(g)}</div><div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}">${esc(g.priority||'Medium')}</span></div><h3>${esc(g.title)}</h3><div class="goal-kpi"><span>${esc(g.kpi||g.measurement||'Outcome')}</span><strong>${pct}% complete</strong></div><div class="goal-bar"><i style="width:${pct}%"></i></div><div class="goal-foot"><span>${d?esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'})):'No deadline'}</span><b>${days!=null?(days<0?'OVERDUE':days===0?'TODAY':days+'d left'):''}</b></div>${(g.reviewDates||[]).length?`<div class="review-row">${reviewBadges(g)}</div>`:''}<div class="goal-stages">${(g.milestones||[]).map((m,i)=>`<button class="goal-stage ${m.done?'done':''}" onclick="event.stopPropagation();toggleGoalStageV8('${g.id}','${m.id}')"><span>${m.done?'✓':i+1}</span><em>${esc(m.title)}</em></button>`).join('')}</div>`;return c};
- if((st.scope||'all')==='quarter'){const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}],groups={spring:[],summer:[],autumn:[],winter:[]};list.forEach(g=>groups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=groups[se.key];if((st.scope||'quarter')!=='quarter'&&!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goals`})));const grid=h('div',{class:'goal-grid'});gs.forEach(g=>grid.append(goalCard(g)));sec.append(grid);body.append(sec)});} else {const grid=h('div',{class:'goal-grid'});list.forEach(g=>grid.append(goalCard(g)));if(list.length)body.append(grid)}
+ if((st.scope||'all')==='quarter'){const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}],groups={spring:[],summer:[],autumn:[],winter:[]};list.forEach(g=>groups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=groups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goals`})));const grid=h('div',{class:'goal-grid'});gs.forEach(g=>grid.append(goalCard(g)));sec.append(grid);body.append(sec)});} else {const grid=h('div',{class:'goal-grid'});list.forEach(g=>grid.append(goalCard(g)));if(list.length)body.append(grid)}
  if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app)};
 
 /* Gregorian-only goal dates: old Persian helper functions remain for legacy data, but no longer appear in Goal UI. */
@@ -5716,70 +5716,333 @@ AppGoals.render=function(root,re,st){
     head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → stages → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallengeV8}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV8({},'week')}));
     app.append(head); const body=h('div',{class:'app-body'}); body.append(challengeCardV6());
     const controls=h('div',{class:'goal-controls'}),scope=h('div',{class:'seg'}),scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];
-    scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'quarter')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));
+    scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re()}})));
     controls.append(scope);
     const cat=h('select',{class:'inp goal-filter'}); cat.append(h('option',{value:'all',text:'All categories'})); goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x}))); cat.value=st.cat||'all'; cat.onchange=()=>{st.cat=cat.value;re()}; controls.append(cat); body.append(controls);
-    const isQuarter=(st.scope||'quarter')==='quarter';
-    // Quarter is the seasonal overview: every Goal belongs to one of the four
-    // Jalali seasons regardless of its Daily/Weekly/Monthly/etc. scope.
-    const list=DB.goals
-      .filter(g=>isQuarter || (st.scope==='all' || g.scope===st.scope))
-      .filter(g=>(st.cat||'all')==='all'||g.category===st.cat)
-      .sort(goalSort);
-    const seasons=[
-      {key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'},
-      {key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'},
-      {key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'},
-      {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'}
-    ];
-    const groups={spring:[],summer:[],autumn:[],winter:[]};
-    list.forEach(g=>groups[goalSeasonV6(g).key].push(g));
-    if(isQuarter){
-      // Always render all four seasons, even when a season has no Goals yet.
-      seasons.forEach(se=>{
-        const gs=groups[se.key];
-        const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});
-        sec.append(h('div',{class:'goal-season-head'},
-          h('div',{class:'goal-season-icon',text:se.icon}),
-          h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:se.months})),
-          h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`})
-        ));
-        if(!gs.length){
-          sec.append(h('div',{class:'empty season-empty',style:{minHeight:'90px'},html:`<div class="tiny">No goals in ${se.name} yet.</div><button class="btn sm" onclick="document.querySelector('.goal-app .btn.primary')?.click()">+ Add goal</button>`}));
-        } else {
-          const byCat={};
-          gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));
-          Object.entries(byCat).forEach(([catName,cgs])=>{
-            sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));
-            const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV6(g)));sec.append(grid);
-          });
-        }
-        body.append(sec);
-      });
-    } else {
-      const grid=h('div',{class:'goal-grid'});
-      list.forEach(g=>grid.append(goalCardV6(g)));
-      if(list.length)body.append(grid);
-      else body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));
-    }
+    const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
+    const seasons=[{key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'}];
+    const groups={spring:[],summer:[],autumn:[],winter:[]}; list.forEach(g=>groups[goalSeasonV6(g).key].push(g));
+    seasons.forEach(se=>{const gs=groups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:se.months})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`})));
+      const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV6(g)));sec.append(grid);});body.append(sec);});
+    if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));
     body.append(growthReviewCard()); app.append(body); root.append(app);
   }catch(err){
     console.error('Goals render failed',err); root.innerHTML=''; const app=h('div',{class:'app'}),body=h('div',{class:'app-body'});body.append(h('div',{class:'empty',html:`<div class="big">⚠️</div><div><strong>Goals could not be rendered.</strong><br><span class="tiny">Your goal data is safe. Try reopening Goals after this update.</span></div><button class="btn primary" onclick="AppGoals.render(this.closest('.app').parentElement,()=>{},{});">Retry</button></div>`}));app.append(body);root.append(app);
   }
 };
 </script>
-</body>
-</html>async function editInvest(t) {
- const isNew=!t.id;
- const out=await formModal(isNew?'New investment movement':'Edit investment movement',[
-  {k:'date',label:'Date',type:'date',required:true},
-  {k:'action',label:'Movement',type:'select',options:[['add','Add to investment'],['reduce','Reduce / spend from investment']]},
-  {type:'row',fields:[{k:'amount',label:'Amount',type:'number',step:'0.01',min:0,required:true},{k:'category',label:'Asset / bucket',type:'select',options:ASSETS.map(a=>[a,a])}]},
-  {k:'source',label:'Source / destination',type:'select',options:PAY_SOURCES.map(p=>[p.v,p.v])},
-  {k:'reason',label:'What happened?',type:'textarea',rows:2,placeholder:'Why was this added or spent?'}
- ],{date:today(),action:Number(t.amount)<0?'reduce':'add',amount:Math.abs(Number(t.amount)||0),category:ASSETS[0],source:PAY_SOURCES[0].v,...t},{onDelete:isNew?null:async()=>{DB.txns=DB.txns.filter(x=>x.id!==t.id);commit();toast('Deleted','trash');}});
- if(!out)return; out.type='invest';out.amount=(out.action==='reduce'?-1:1)*Math.abs(Number(out.amount)||0);delete out.action;
- if(isNew)DB.txns.push({id:uid(),...out});else Object.assign(DB.txns.find(x=>x.id===t.id),out);
- Money.jumpTo=monthKey(out.date);commit();toast(isNew?'Investment movement logged':'Updated','wallet');
-}
+<script>
+/* Goals FIX v10: stable render + quarter seasons + checklist-driven progress */
+(function(){
+  function ensureGoalsSafe(){
+    if(!window.DB) window.DB={};
+    if(!Array.isArray(DB.goals)) DB.goals=[];
+    if(!DB.challenges || typeof DB.challenges!=='object' || Array.isArray(DB.challenges)) DB.challenges={};
+    if(!Array.isArray(DB.projects)) DB.projects=[];
+    if(!Array.isArray(DB.goalCategories)) DB.goalCategories=['Work','Personal','Learning','Health','Finance','Relationships'];
+    DB.goals.forEach(g=>{
+      g.category ||= 'General'; g.priority ||= 'Medium'; g.scope ||= 'year';
+      g.measurement ||= 'milestone'; g.milestones=Array.isArray(g.milestones)?g.milestones:[];
+      g.milestones=g.milestones.map(m=>({id:m.id||uid(),title:String(m.title||'Milestone'),done:!!m.done,completedAt:m.completedAt||''})).filter(m=>m.title.trim());
+      g.reviewDates=Array.isArray(g.reviewDates)?g.reviewDates:[];
+    });
+  }
+  function checklistProgress(g){
+    const ms=Array.isArray(g.milestones)?g.milestones:[];
+    if(ms.length) return Math.round(ms.filter(m=>m.done).length/ms.length*100);
+    try{return Math.round(Math.max(0,Math.min(100,Number(goalPct(g))||0)));}catch(e){return g.done?100:0;}
+  }
+  function toggleChecklistItem(gid,mid){
+    ensureGoalsSafe(); const g=DB.goals.find(x=>x.id===gid); if(!g)return;
+    const m=g.milestones.find(x=>x.id===mid); if(!m)return;
+    m.done=!m.done; m.completedAt=m.done?today():'';
+    g.done=g.milestones.length>0 && g.milestones.every(x=>x.done);
+    commit();
+  }
+  window.toggleGoalStageV8=toggleChecklistItem;
 
+  function safeSeason(g){
+    const base=String((g&& (g.endDate||g.deadline||g.startDate))||today());
+    let jm=1;
+    const p=base.split('-').map(Number);
+    try{ if(p.length===3 && typeof gregorianToJalali==='function') jm=Number(gregorianToJalali(p[0],p[1],p[2])[1])||1; else jm=Number(p[1])||1; }
+    catch(e){ jm=Number(p[1])||1; }
+    if(jm<=3)return {key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'};
+    if(jm<=6)return {key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'};
+    if(jm<=9)return {key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'};
+    return {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'};
+  }
+
+  async function editGoalV9(g={},scope){
+    ensureGoalsSafe(); const isNew=!g.id;
+    const old=Array.isArray(g.milestones)?g.milestones:[];
+    const milestoneText=old.map(m=>m.title).join('\n');
+    const out=await formModal(isNew?'New goal':'Edit goal',[
+      {k:'title',label:'Goal',required:true,placeholder:'What must become true?'},
+      {type:'row',fields:[
+        {k:'category',label:'Category',type:'select',options:goalCategories().map(x=>[x,x])},
+        {k:'scope',label:'Horizon',type:'select',options:[['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']]}
+      ]},
+      {type:'row',fields:[{k:'startDate',label:'Start date',type:'date',required:true},{k:'endDate',label:'Deadline',type:'date'}]},
+      {k:'measurement',label:'How is success measured?',type:'select',options:[['milestone','Checklist / milestones'],['hours','Time / Hours'],['output','Output / Deliverables'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['binary','Binary outcome'],['consistency','Consistency / Frequency']]},
+      {type:'row',fields:[{k:'kpi',label:'KPI name'},{k:'unit',label:'Unit'}]},
+      {type:'row',fields:[{k:'current',label:'Current value',type:'number',step:'any'},{k:'target',label:'Target value',type:'number',step:'any'}]},
+      {k:'milestoneText',label:'Checklist / milestones',type:'textarea',rows:7,placeholder:'One item per line\nExample:\nResearch\nBuild first version\nTest\nPublish',hint:'Each line becomes a checkbox. Progress is calculated from checked items.'},
+      {k:'reviewText',label:'Review dates',placeholder:'2026-09-01, 2026-10-01',hint:'Gregorian dates, comma-separated.'},
+      {k:'why',label:'Why this matters',type:'textarea',rows:2},
+      {k:'definition',label:'Definition of Done',type:'textarea',rows:2},
+      {k:'nextAction',label:'Next action'},
+      {k:'blocker',label:'Current blocker / risk'}
+    ],{
+      title:g.title||'',category:g.category||'General',scope:scope||g.scope||'week',startDate:g.startDate||today(),endDate:g.endDate||'',
+      measurement:g.measurement||'milestone',kpi:g.kpi||'',unit:g.unit||'',current:g.current??0,target:g.target??'',milestoneText,reviewText:(g.reviewDates||[]).join(', '),
+      why:g.why||'',definition:g.definition||'',nextAction:g.nextAction||'',blocker:g.blocker||''
+    },{onDelete:isNew?null:async()=>{if(await confirmModal('Delete goal?',`Delete “${g.title||''}” permanently?`,'Delete')){DB.goals=DB.goals.filter(x=>x.id!==g.id);commit();}}});
+    if(!out)return;
+    const titles=String(out.milestoneText||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    const next=titles.map((title,i)=>{const byIndex=old[i]; const byTitle=old.find(m=>m.title===title); const m=byTitle||byIndex||{}; return {id:m.id||uid(),title,done:!!m.done,completedAt:m.completedAt||''};});
+    out.milestones=next; out.reviewDates=String(out.reviewText||'').split(',').map(x=>x.trim()).filter(Boolean); delete out.milestoneText; delete out.reviewText;
+    out.done=next.length>0 && next.every(m=>m.done);
+    if(isNew)DB.goals.push({id:uid(),createdAt:today(),...out}); else Object.assign(DB.goals.find(x=>x.id===g.id),out);
+    commit();
+  }
+  window.editGoalV8=editGoalV9;
+
+  function goalCard(g){
+    const pct=checklistProgress(g), d=goalDeadline(g), ms=g.milestones||[];
+    let days=null; try{days=d?daysBetween(today(),d):null;}catch(e){}
+    const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});
+    c.onclick=e=>{if(!e.target.closest('button,.goal-check-input'))editGoalV9(g);};
+    const head=h('div',{class:'goal-head'},h('span',{class:'goal-dot'}),h('span',{class:'goal-cat',text:g.category||'General'}),h('span',{class:'goal-pri '+String(g.priority||'Medium').toLowerCase(),text:g.priority||'Medium'}));
+    c.append(h('div',{class:'goal-glow'}),h('div',{class:'goal-sticker',text:goalSticker(g)}),head,h('h3',{text:g.title||'Untitled goal'}));
+    const kpi=h('div',{class:'goal-kpi'},h('span',{text:g.kpi||g.measurement||'Checklist'}),h('strong',{text:`${pct}% complete`})); c.append(kpi,h('div',{class:'goal-bar'},h('i',{style:{width:pct+'%'}})));
+    const foot=h('div',{class:'goal-foot'},h('span',{text:d?fmtDate(d,{month:'short',day:'numeric',year:'numeric'}):'No deadline'}),h('b',{text:days!=null?(days<0?'OVERDUE':days===0?'TODAY':days+'d left'):''})); c.append(foot);
+    if(ms.length){
+      const box=h('div',{class:'goal-checklist'});
+      const top=h('div',{class:'goal-checklist-head'},h('strong',{text:`Checklist · ${ms.filter(m=>m.done).length}/${ms.length}`}),h('span',{class:'tiny',text:`${pct}%`})); box.append(top);
+      ms.forEach((m,i)=>{
+        const row=h('label',{class:'goal-check-row '+(m.done?'done':'')});
+        const cb=h('input',{class:'goal-check-input',type:'checkbox'}); cb.checked=!!m.done; cb.onchange=()=>toggleChecklistItem(g.id,m.id);
+        row.append(cb,h('span',{class:'goal-check-mark',text:m.done?'✓':''}),h('span',{text:m.title})); box.append(row);
+      });
+      c.append(box);
+    } else {
+      c.append(h('div',{class:'goal-checklist-empty',text:'No checklist items yet. Open the goal to add milestones.'}));
+    }
+    const actions=h('div',{class:'goal-card-actions'},h('button',{class:'btn ghost sm',text:'Edit goal',onclick:()=>editGoalV9(g)}),h('button',{class:'btn sm',text:'+ Checklist item',onclick:async()=>{
+      const o=await formModal('Add checklist item',[{k:'title',label:'Milestone / checklist item',required:true}],{}); if(!o)return;
+      g.milestones ||= []; g.milestones.push({id:uid(),title:o.title,done:false,completedAt:''}); g.measurement='milestone'; commit();
+    }})); c.append(actions);
+    return c;
+  }
+
+  function challengeCardSafe(){
+    try{return challengeCardV6();}
+    catch(e){
+      try{return challengeCard(reRenderGoals);}
+      catch(e2){
+        const card=h('div',{class:'challenge-hero'});
+        card.append(h('div',{class:'challenge-copy'},h('h2',{text:'Monthly Challenge'}),h('p',{text:'Set a challenge with a Gregorian start and end date.'})));
+        card.append(h('button',{class:'btn primary',text:'Set challenge',onclick:editChallengeV8}));
+        return card;
+      }
+    }
+  }
+  let reRenderGoals=()=>{};
+
+  AppGoals.render=function(root,re,st){
+    try{
+      ensureGoalsSafe(); st=st||{}; if(!st.scope)st.scope='quarter';
+      reRenderGoals=re||(()=>AppGoals.render(root,re,st));
+      const app=h('div',{class:'app goal-app'}), head=h('div',{class:'app-head'});
+      head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Goals → checklist → progress → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',text:'⚡ Challenge',onclick:editChallengeV8}),h('button',{class:'btn primary sm',text:'+ Goal',onclick:()=>editGoalV9({},'week')}));
+      app.append(head); const body=h('div',{class:'app-body'}); body.append(challengeCardSafe());
+      const controls=h('div',{class:'goal-controls'}),scopeBox=h('div',{class:'seg'});
+      [['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']].forEach(([k,l])=>scopeBox.append(h('button',{class:st.scope===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));
+      controls.append(scopeBox);
+      const cat=h('select',{class:'inp goal-filter'}); cat.append(h('option',{value:'all',text:'All categories'})); goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x}))); cat.value=st.cat||'all'; cat.onchange=()=>{st.cat=cat.value;re()}; controls.append(cat); body.append(controls);
+      const quarter=st.scope==='quarter';
+      const list=DB.goals.filter(g=>quarter || st.scope==='all' || g.scope===st.scope).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);
+      const seasons=[
+        {key:'spring',name:'Spring',months:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'},
+        {key:'summer',name:'Summer',months:'Tir → Shahrivar',icon:'☀️',color:'#f59e0b'},
+        {key:'autumn',name:'Autumn',months:'Mehr → Azar',icon:'🍂',color:'#f97316'},
+        {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'}
+      ];
+      if(quarter){
+        const groups={spring:[],summer:[],autumn:[],winter:[]}; list.forEach(g=>groups[safeSeason(g).key].push(g));
+        seasons.forEach(se=>{
+          const gs=groups[se.key], sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});
+          sec.append(h('div',{class:'goal-season-head'},h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:se.months})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`})));
+          if(!gs.length) sec.append(h('div',{class:'season-empty',text:`No goals in ${se.name} yet.`}));
+          else {
+            const byCat={}; gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));
+            Object.entries(byCat).forEach(([name,items])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:name}),h('span',{class:'tiny',text:String(items.length)})));const grid=h('div',{class:'goal-grid'});items.forEach(g=>grid.append(goalCard(g)));sec.append(grid);});
+          }
+          body.append(sec);
+        });
+      } else {
+        const grid=h('div',{class:'goal-grid'}); list.forEach(g=>grid.append(goalCard(g))); body.append(grid);
+        if(!list.length)body.append(h('div',{class:'empty',text:'No goals in this horizon yet.'}));
+      }
+      try{body.append(growthReviewCard());}catch(e){console.warn('Growth Review skipped',e);}
+      app.append(body); root.innerHTML=''; root.append(app);
+    }catch(err){
+      console.error('Goals render failed',err);
+      root.innerHTML='';
+      const app=h('div',{class:'app goal-app'}), body=h('div',{class:'app-body'});
+      body.append(h('div',{class:'empty'},h('div',{class:'big',text:'⚠️'}),h('div',{text:'Goals could not be rendered.'}),h('div',{class:'tiny',text:String(err&&err.message||err)}),h('button',{class:'btn primary',text:'Retry',onclick:()=>AppGoals.render(root,re,{scope:'quarter'})})));
+      app.append(body);root.append(app);
+    }
+  };
+
+  const style=document.createElement('style');
+  style.textContent=`
+    .goal-checklist{margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.025)}
+    .goal-checklist-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+    .goal-check-row{display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;border-top:1px solid rgba(255,255,255,.06);font-size:13px}
+    .goal-check-row.done span:last-child{text-decoration:line-through;opacity:.58}
+    .goal-check-input{position:absolute;opacity:0;pointer-events:none}
+    .goal-check-mark{width:20px;height:20px;min-width:20px;border:1px solid var(--border);border-radius:6px;display:grid;place-items:center;font-size:12px;background:rgba(255,255,255,.04)}
+    .goal-check-row.done .goal-check-mark{background:var(--accent);border-color:var(--accent);color:#fff}
+    .goal-checklist-empty{margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:12px}
+    .goal-card-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .season-empty{padding:18px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);margin-top:10px}
+  `; document.head.appendChild(style);
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   GOALS V10 — review-due queue + calendar-based multi review dates
+   ============================================================ */
+(function(){
+  function normReviewDates(g){
+    const arr=Array.isArray(g.reviewDates)?g.reviewDates:[];
+    return [...new Set(arr.map(x=>String(x||'').slice(0,10)).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)))].sort();
+  }
+  function reviewDueDate(g){
+    const last=String(g.lastReviewedAt||'');
+    return normReviewDates(g).filter(d=>d<=today() && (!last || d>last)).pop()||'';
+  }
+  function reviewStatusText(d){
+    if(!d)return '';
+    if(d<today())return 'Overdue';
+    return 'Due today';
+  }
+
+  function pickReviewDates(initial=[]){
+    return new Promise(resolve=>{
+      const dates=[...new Set((initial||[]).map(x=>String(x||'').slice(0,10)).filter(Boolean))].sort();
+      const body=h('div',{});
+      body.append(h('div',{class:'tiny',style:{marginBottom:'12px'},text:'Choose one or more review dates. You can use the calendar picker — no typing required.'}));
+      const rows=h('div',{}); body.append(rows);
+      const addRow=(value='')=>{
+        const row=h('div',{class:'review-date-pick-row',style:{display:'flex',gap:'8px',alignItems:'center',marginBottom:'8px'}});
+        const input=h('input',{class:'inp',type:'date',value,style:{flex:1}});
+        const del=h('button',{class:'btn ghost sm',type:'button',text:'Remove',onclick:()=>{row.remove();}});
+        row.append(input,del); rows.append(row);
+      };
+      (dates.length?dates:['']).forEach(addRow);
+      const add=h('button',{class:'btn sm',type:'button',text:'+ Add another date',onclick:()=>addRow('')});
+      body.append(add);
+      const quick=h('div',{style:{display:'flex',gap:'7px',flexWrap:'wrap',marginTop:'12px'}});
+      const quickAdd=(label,make)=>quick.append(h('button',{class:'btn ghost sm',type:'button',text:label,onclick:()=>make().forEach(x=>addRow(x))}));
+      quickAdd('Next 4 weeks',()=>Array.from({length:4},(_,i)=>addDays(today(),(i+1)*7)));
+      quickAdd('Next 3 months',()=>Array.from({length:3},(_,i)=>{const d=new Date(today()+'T00:00:00');d.setMonth(d.getMonth()+i+1);return d.toISOString().slice(0,10)}));
+      const foot=h('div',{style:{display:'flex',gap:'8px',width:'100%'}});
+      foot.append(h('div',{class:'spacer'}),h('button',{class:'btn',type:'button',text:'Cancel',onclick:()=>{closeModal();resolve(null);}}),h('button',{class:'btn primary',type:'button',text:'Save review dates',onclick:()=>{
+        const out=[...rows.querySelectorAll('input[type=date]')].map(x=>x.value).filter(Boolean);
+        const unique=[...new Set(out)].sort(); closeModal(); resolve(unique);
+      }}));
+      modal({title:'Review dates',bodyNode:body,footNode:foot,wide:false});
+    });
+  }
+
+  async function editGoalV10(g={},scope){
+    ensureGoalsSafe();
+    const isNew=!g.id;
+    const old=Array.isArray(g.milestones)?g.milestones:[];
+    const milestoneText=old.map(m=>m.title).join('\n');
+    const out=await formModal(isNew?'New goal':'Edit goal',[
+      {k:'title',label:'Goal',required:true,placeholder:'What must become true?'},
+      {type:'row',fields:[
+        {k:'category',label:'Category',type:'select',options:goalCategories().map(x=>[x,x])},
+        {k:'scope',label:'Horizon',type:'select',options:[['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']]}
+      ]},
+      {type:'row',fields:[{k:'startDate',label:'Start date',type:'date',required:true},{k:'endDate',label:'Deadline',type:'date'}]},
+      {k:'measurement',label:'How is success measured?',type:'select',options:[['milestone','Checklist / milestones'],['hours','Time / Hours'],['output','Output / Deliverables'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['binary','Binary outcome'],['consistency','Consistency / Frequency']]},
+      {type:'row',fields:[{k:'kpi',label:'KPI name'},{k:'unit',label:'Unit'}]},
+      {type:'row',fields:[{k:'current',label:'Current value',type:'number',step:'any'},{k:'target',label:'Target value',type:'number',step:'any'}]},
+      {k:'milestoneText',label:'Checklist / milestones',type:'textarea',rows:7,placeholder:'One item per line\nExample:\nResearch\nBuild first version\nTest\nPublish',hint:'Each line becomes a checkbox. Progress is calculated from checked items.'},
+      {k:'why',label:'Why this matters',type:'textarea',rows:2},
+      {k:'definition',label:'Definition of Done',type:'textarea',rows:2},
+      {k:'nextAction',label:'Next action'},
+      {k:'blocker',label:'Current blocker / risk'}
+    ],{
+      title:g.title||'',category:g.category||'General',scope:scope||g.scope||'week',startDate:g.startDate||today(),endDate:g.endDate||'',
+      measurement:g.measurement||'milestone',kpi:g.kpi||'',unit:g.unit||'',current:g.current??0,target:g.target??'',milestoneText,
+      why:g.why||'',definition:g.definition||'',nextAction:g.nextAction||'',blocker:g.blocker||''
+    },{onDelete:isNew?null:async()=>{if(await confirmModal('Delete goal?',`Delete “${g.title||''}” permanently?`,'Delete')){DB.goals=DB.goals.filter(x=>x.id!==g.id);commit();}}});
+    if(!out)return;
+
+    const selectedReviews=await pickReviewDates(normReviewDates(g));
+    if(selectedReviews===null)return;
+    const titles=String(out.milestoneText||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    const next=titles.map((title,i)=>{const byTitle=old.find(m=>m.title===title);const byIndex=old[i];const m=byTitle||byIndex||{};return{id:m.id||uid(),title,done:!!m.done,completedAt:m.completedAt||''};});
+    out.milestones=next; out.reviewDates=selectedReviews; out.lastReviewedAt=g.lastReviewedAt||'';
+    delete out.milestoneText; out.done=next.length>0&&next.every(m=>m.done);
+    if(isNew)DB.goals.push({id:uid(),createdAt:today(),...out}); else Object.assign(DB.goals.find(x=>x.id===g.id),out);
+    commit();
+  }
+  window.editGoalV8=editGoalV10;
+  window.editGoalV9=editGoalV10;
+
+  function reviewDueCard(g){
+    const due=reviewDueDate(g); if(!due)return null;
+    const card=h('div',{class:'review-due-card'});
+    const left=h('div',{style:{flex:1,minWidth:0}});
+    left.append(h('div',{class:'review-due-title',text:g.title||'Untitled goal'}),h('div',{class:'tiny',text:`${reviewStatusText(due)} · ${fmtDate(due,{month:'short',day:'numeric',year:'numeric'})}`}));
+    const nextDates=normReviewDates(g).filter(d=>d>today());
+    if(nextDates.length)left.append(h('div',{class:'tiny',style:{marginTop:'3px'},text:`Next review · ${fmtDate(nextDates[0],{month:'short',day:'numeric',year:'numeric'})}`}));
+    const pct=checklistProgress(g); left.append(h('div',{class:'review-due-progress'},h('i',{style:{width:pct+'%'}})));
+    const actions=h('div',{style:{display:'flex',gap:'7px',flexWrap:'wrap',alignItems:'center'}},h('button',{class:'btn primary sm',text:'Review goal',onclick:()=>editGoalV10(g)}),h('button',{class:'btn ghost sm',text:'Mark reviewed',onclick:()=>{g.lastReviewedAt=due;commit();}}));
+    card.append(left,actions); return card;
+  }
+
+  const oldGoalsRender=AppGoals.render;
+  AppGoals.render=function(root,re,st){
+    try{
+      oldGoalsRender(root,re,st);
+      const app=root.querySelector('.goal-app'); if(!app)return;
+      const body=app.querySelector('.app-body'); if(!body)return;
+      const due=DB.goals.filter(g=>reviewDueDate(g));
+      const queue=h('section',{class:'review-due-section'});
+      const head=h('div',{class:'review-due-head'});
+      head.append(h('div',{},h('h3',{text:'🔔 Reviews due'}),h('div',{class:'tiny',text:due.length?`${due.length} goal${due.length===1?'':'s'} need attention now.`:'No reviews are due right now.'})));
+      if(due.length)head.append(h('span',{class:'review-due-count',text:String(due.length)}));
+      queue.append(head);
+      if(due.length)due.forEach(g=>{const c=reviewDueCard(g);if(c)queue.append(c);});
+      else queue.append(h('div',{class:'review-due-empty',text:'You are all caught up. Upcoming review dates will appear here when they arrive.'}));
+      body.prepend(queue);
+    }catch(e){console.warn('Review due section skipped',e)}
+  };
+
+  const style=document.createElement('style');
+  style.textContent=`
+    .review-due-section{margin-bottom:16px;padding:14px;border:1px solid rgba(232,86,127,.28);border-radius:18px;background:linear-gradient(180deg,rgba(232,86,127,.09),rgba(255,255,255,.02))}
+    .review-due-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .review-due-head h3{margin:0 0 3px;font-size:16px}
+    .review-due-count{display:grid;place-items:center;min-width:28px;height:28px;border-radius:99px;background:var(--accent);color:#fff;font-weight:800}
+    .review-due-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.12);margin-top:8px}
+    .review-due-title{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .review-due-progress{height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:8px;max-width:360px}
+    .review-due-progress i{display:block;height:100%;background:var(--accent);border-radius:99px}
+    .review-due-empty{padding:12px;border-radius:12px;background:rgba(255,255,255,.025);color:var(--muted);font-size:12px}
+    .review-date-pick-row .inp{min-width:0}
+  `;document.head.appendChild(style);
+})();
+</script>
+</body>
+</html>
