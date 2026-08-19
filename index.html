@@ -876,6 +876,10 @@ html[data-theme="light"] .vision-hero::before{opacity:.20}
 .task-section-label strong{font-size:12px}
 .task-section-divider{height:1px;background:var(--border);margin:10px 0}
 </style>
+
+<style id="task-pinned-user-friendly">
+.task-section-label{position:sticky;top:0;z-index:3;background:var(--surface);backdrop-filter:blur(8px)}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -1175,7 +1179,26 @@ function openApp(id, arg) {
 
   const body = $('.win-body', node);
   const state = {};
-  const rerender = () => { const sc = body.scrollTop; body.innerHTML = ''; app.render(body, rerender, state); body.scrollTop = sc; };
+  const rerender = () => {
+    const scrollState = [];
+    const before = [body, ...body.querySelectorAll('*')];
+    before.forEach((el, i) => {
+      if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
+        scrollState.push([i, el.scrollTop, el.scrollLeft]);
+      }
+    });
+    body.innerHTML = '';
+    app.render(body, rerender, state);
+    const after = [body, ...body.querySelectorAll('*')];
+    scrollState.forEach(([i, top, left]) => {
+      const el = after[i];
+      if (!el) return;
+      if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
+        el.scrollTop = top;
+        el.scrollLeft = left;
+      }
+    });
+  };
   WINS.set(id, { node, app, state, rerender });
   LIVE.set(id, rerender);
   rerender();
@@ -2292,7 +2315,7 @@ const AppTasks = {
     else if (st.filter.startsWith('p:')) { const p = projOf(st.filter.slice(2)); list = list.filter(t => t.projectId === st.filter.slice(2) && !t.notDone); heading = p ? p.name : 'Project'; }
     const doneCount = list.filter(t => t.done).length;
     if (!st.showDone && st.filter !== 'notdone') list = list.filter(t => !t.done && !t.notDone);
-    list = list.filter(t => !t.notDone);
+    if (st.filter !== 'notdone') list = list.filter(t => !t.notDone);
     list.sort((a,b) => Number(!!b.pinned) - Number(!!a.pinned) || taskSort(a,b));
 
     const bar = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px 6px' } });
