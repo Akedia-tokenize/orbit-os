@@ -6101,8 +6101,50 @@ AppGoals.render=function(root,re,st){
   const _oldGoalsRender = AppGoals.render;
 
   function quarterCategory(g){
-    const p=(DB.projects||[]).find(x=>x.id===g.categoryId);
+    const p=(DB.projects||[]).find(x=>x.id===g.categoryId || x.name===g.category);
     return p ? p.name : (g.category || 'Uncategorised');
+  }
+  function quarterSeason(g){
+    const base=String((g&&(g.endDate||g.deadline||g.startDate))||today()).slice(0,10);
+    const p=base.split('-').map(Number); let jm=Number(p[1])||1;
+    try{if(p.length===3&&typeof gregorianToJalali==='function') jm=Number(gregorianToJalali(p[0],p[1],p[2])[1])||jm;}catch(e){}
+    if(jm<=3)return {key:'spring'}; if(jm<=6)return {key:'summer'}; if(jm<=9)return {key:'autumn'}; return {key:'winter'};
+  }
+  function quarterProgress(g){
+    const ms=Array.isArray(g.milestones)?g.milestones:[];
+    return ms.length?Math.round(ms.filter(m=>m.done).length/ms.length*100):0;
+  }
+  function quarterGoalCard(g){
+    const pct=quarterProgress(g), d=goalDeadline(g), ms=Array.isArray(g.milestones)?g.milestones:[];
+    let days=null; try{days=d?daysBetween(today(),d):null;}catch(e){}
+    const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});
+    c.onclick=e=>{if(!e.target.closest('button,.goal-check-input')) window.editGoalV8(g);};
+    c.append(h('div',{class:'goal-glow'}),h('div',{class:'goal-sticker',text:goalSticker(g)}),
+      h('div',{class:'goal-head'},h('span',{class:'goal-dot'}),h('span',{class:'goal-cat',text:quarterCategory(g)}),h('span',{class:'goal-pri '+String(g.priority||'Medium').toLowerCase(),text:g.priority||'Medium'})),
+      h('h3',{text:g.title||'Untitled goal'}),
+      h('div',{class:'goal-kpi'},h('span',{text:g.kpi||g.measurement||'Checklist'}),h('strong',{text:`${pct}% complete`})),
+      h('div',{class:'goal-bar'},h('i',{style:{width:pct+'%'}})),
+      h('div',{class:'goal-foot'},h('span',{text:d?fmtDate(d,{month:'short',day:'numeric',year:'numeric'}):'No deadline'}),h('b',{text:days!=null?(days<0?'OVERDUE':days===0?'TODAY':days+'d left'):''}))
+    );
+    if(ms.length){
+      const box=h('div',{class:'goal-checklist'});
+      box.append(h('div',{class:'goal-checklist-head'},h('strong',{text:`Checklist · ${ms.filter(m=>m.done).length}/${ms.length}`}),h('span',{class:'tiny',text:`${pct}%`})));
+      ms.forEach(m=>{
+        const row=h('label',{class:'goal-check-row '+(m.done?'done':'')}); row.onclick=e=>e.stopPropagation();
+        const cb=h('input',{class:'goal-check-input',type:'checkbox'}); cb.checked=!!m.done;
+        cb.onchange=e=>{e.stopPropagation(); if(window.toggleGoalStageV8) window.toggleGoalStageV8(g.id,m.id); setTimeout(()=>{try{AppGoals.render(document.querySelector('.app.goal-app')?.parentElement,()=>{}, {scope:'quarter'});}catch(err){}},0);};
+        row.append(cb,h('span',{class:'goal-check-mark',text:m.done?'✓':''}),h('span',{text:m.title})); box.append(row);
+      }); c.append(box);
+    }
+    const actions=h('div',{class:'goal-quarter-actions'});
+    actions.append(h('button',{class:'btn ghost sm',type:'button',text:'↗ Add to another section',onclick:async(e)=>{
+      e.stopPropagation(); const out=await formModal('Add this quarterly goal to another section',[
+        {k:'scope',label:'Section / horizon',type:'select',options:[['week','Weekly'],['month','Monthly'],['year','Yearly'],['long','Long-term']]},
+        {k:'copy',label:'Create a copy',type:'select',options:[['yes','Yes — keep the Quarterly goal'],['no','No — move it out of Quarterly']]}
+      ],{scope:'month',copy:'yes'}); if(!out)return; const target=out.scope;
+      if(out.copy==='no')g.scope=target; else {const cp=JSON.parse(JSON.stringify(g));cp.id=uid();cp.scope=target;cp.createdAt=today();DB.goals.push(cp);} commit(); toast(out.copy==='no'?'Goal moved':'Goal copied to '+target,'check');
+    }}));
+    c.append(actions); return c;
   }
   function quarterCategoryRank(name){
     const i=(DB.projects||[]).findIndex(x=>x.name===name);
@@ -6110,7 +6152,7 @@ AppGoals.render=function(root,re,st){
   }
   function quarterGoalDate(g){ return String(g.deadline||g.endDate||g.startDate||g.createdAt||'9999-12-31').slice(0,10); }
   function quarterGoalCard(g){
-    const c=goalCard(g);
+    const c=quarterGoalCard(g);
     const actions=h('div',{class:'goal-quarter-actions'});
     actions.append(h('button',{class:'btn ghost sm',type:'button',text:'↗ Add to another section',onclick:async(e)=>{
       e.stopPropagation();
@@ -6135,7 +6177,7 @@ AppGoals.render=function(root,re,st){
     ensureGoalsSafe();
     const app=h('div',{class:'app goal-app'});
     const head=h('div',{class:'app-head'});
-    head.append(h('div',{},h('h2',{text:'Quarter'}),h('div',{class:'sub',text:'Four seasons · standalone quarterly goals'})),h('div',{class:'spacer'}),h('button',{class:'btn primary sm',text:'+ Quarterly Goal',onclick:()=>editGoalV10({},'quarter')}));
+    head.append(h('div',{},h('h2',{text:'Quarter'}),h('div',{class:'sub',text:'Four seasons · standalone quarterly goals'})),h('div',{class:'spacer'}),h('button',{class:'btn primary sm',text:'+ Quarterly Goal',onclick:()=>window.editGoalV8({},'quarter')}));
     app.append(head);
     const body=h('div',{class:'app-body'});
     const seasons=[
@@ -6145,7 +6187,7 @@ AppGoals.render=function(root,re,st){
       {key:'winter',name:'Winter',months:'Dey → Esfand',icon:'❄️',color:'#38bdf8'}
     ];
     const groups={spring:[],summer:[],autumn:[],winter:[]};
-    (DB.goals||[]).filter(g=>g.scope==='quarter').forEach(g=>{ const s=safeSeason(g); (groups[s.key]||groups.spring).push(g); });
+    (DB.goals||[]).filter(g=>g.scope==='quarter').forEach(g=>{ const s=quarterSeason(g); (groups[s.key]||groups.spring).push(g); });
     seasons.forEach(se=>{
       const gs=groups[se.key].slice().sort((a,b)=>quarterCategoryRank(quarterCategory(a))-quarterCategoryRank(quarterCategory(b)) || quarterCategory(a).localeCompare(quarterCategory(b)) || quarterGoalDate(a).localeCompare(quarterGoalDate(b)) || String(a.title||'').localeCompare(String(b.title||'')));
       const sec=h('section',{class:'goal-season quarter-season',style:{'--season-color':se.color}});
