@@ -5954,7 +5954,7 @@ AppGoals.render=function(root,re,st){
       h('span',{class:'goal-dot'}),
       h('span',{class:'goal-cat',text:g.category||'General'}),
       h('span',{class:`goal-pri ${String(importance).toLowerCase()}`,text:`Importance · ${importance}`}),
-      h('button',{class:'item-pin-btn goal-pin '+(g.pinned?'on':''),title:g.pinned?'Unpin goal':'Pin goal',ariaLabel:g.pinned?'Pinned goal — click to unpin':'Pin goal',text:g.pinned?'📌':'📍',onclick:e=>{e.stopPropagation();g.pinned=!g.pinned;commit();re();}})
+      h('span',{class:'goal-pin-status '+(g.pinned?'on':''),title:g.pinned?'Pinned goal':'Goal not pinned',text:g.pinned?'📌':' '})
     );
     c.append(h('div',{class:'goal-sticker',text:g.sticker||'🎯'}),head); if(g.pinned)c.append(h('span',{class:'goal-pinned-badge',text:'📌 Pinned'}));
     c.append(h('h3',{text:g.title||'Untitled goal'}));
@@ -5982,6 +5982,7 @@ AppGoals.render=function(root,re,st){
     }
     const actions=h('div',{class:'goal-card-actions'});
     actions.append(h('button',{class:'btn ghost sm',text:'Edit',onclick:e=>{e.stopPropagation();openEditor(g,re)}}));
+    actions.append(h('button',{class:'btn sm goal-pin-action '+(g.pinned?'primary':'ghost'),text:g.pinned?'📌 Pinned':'📍 Pin',title:g.pinned?'Unpin this goal':'Pin this goal',onclick:e=>{e.preventDefault();e.stopPropagation();g.pinned=!g.pinned;commit();re();}}));
     actions.append(h('button',{class:'btn ghost sm',text:g.notDone?'↩ Mark active':'Didn’t do',onclick:async e=>{e.stopPropagation();if(g.notDone){g.notDone=false;g.notDoneReason='';commit();re();return;}const out=await formModal('Goal not completed',[{k:'reason',label:'Why didn’t you complete this goal?',type:'textarea',rows:4,required:true}],{reason:''});if(out&&String(out.reason||'').trim()){g.notDone=true;g.notDoneReason=String(out.reason).trim();g.notDoneAt=today();g.done=false;commit();re();}}}));
     c.append(actions);
     if(g.notDone)c.append(h('div',{class:'goal-not-done-note'},h('strong',{text:'Not completed'}),h('span',{text:g.notDoneReason||''})));
@@ -6125,6 +6126,80 @@ AppGoals.render=function(root,re,st){
   DB.courses.forEach(x=>x.pinned=!!x.pinned);
   DB.habits.forEach(x=>x.pinned=!!x.pinned);
   Object.values(DB.challenges||{}).forEach(x=>x.pinned=!!x.pinned);
+})();
+</script>
+
+<style>
+/* ---- task cleanup: not-done is an archive state, not an open task ---- */
+.task.task-notdone{
+  background:color-mix(in srgb,var(--crit) 5%,var(--surface-2));
+  border:1px solid color-mix(in srgb,var(--crit) 22%,var(--border));
+}
+.task-archive-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--crit) 5%,var(--surface-2));border:1px solid color-mix(in srgb,var(--crit) 20%,var(--border));margin:4px 0}
+.task-archive-mark{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;background:color-mix(in srgb,var(--crit) 18%,var(--surface-3));color:var(--crit);font-size:13px;font-weight:800}
+.task-archive-title{font-size:13.5px;font-weight:650;word-break:break-word}
+.task-archive-reason{margin-top:4px;color:var(--muted);font-size:11.5px;line-height:1.45}
+.home-task-area .task{min-width:0}
+.home-task-area .task .ttl{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.home-task-area .task > div:nth-child(2){min-width:0;flex:1 1 auto}
+.home-task-area .task > div:last-child{max-width:45%;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:700px){.home-task-area .task > div:last-child{max-width:52%}}
+</style>
+<script>
+/* ============================================================
+   FINAL TASK STATE CLEANUP
+   - Not done never appears in open/Home lists.
+   - Not done is displayed as an archive record, not a checkable task.
+   - Home task cards stay compact instead of wrapping titles vertically.
+   ============================================================ */
+(function(){
+  const baseTaskRowClean = taskRow;
+  function notDoneArchiveRow(t,re){
+    const p=projOf(t.projectId);
+    const row=document.createElement('div'); row.className='task-archive-row';
+    const mark=document.createElement('div'); mark.className='task-archive-mark'; mark.textContent='×';
+    const mid=document.createElement('div'); mid.style.cssText='flex:1;min-width:0;cursor:pointer';
+    const title=document.createElement('div'); title.className='task-archive-title'; title.textContent=t.title||'';
+    const meta=document.createElement('div'); meta.className='meta'; meta.style.marginTop='4px';
+    if(t.due) meta.append(Object.assign(document.createElement('span'),{className:'due '+dueClass(t),textContent:relDay(t.due)}));
+    if(p){const chip=document.createElement('span');chip.className='chip';chip.innerHTML=`<i class="dot" style="background:${p.color}"></i>${esc(p.name)}`;meta.append(chip);}
+    const badge=document.createElement('span'); badge.className='chip'; badge.style.color='var(--crit)'; badge.style.borderColor='color-mix(in srgb,var(--crit) 35%,var(--border))'; badge.textContent='Not done'; meta.append(badge);
+    const reason=document.createElement('div'); reason.className='task-archive-reason'; reason.textContent=t.notDoneReason ? `Why: ${t.notDoneReason}` : 'No reason recorded';
+    mid.append(title,meta,reason);
+    mid.onclick=()=>editTask(t);
+    const actions=document.createElement('div'); actions.style.cssText='display:flex;gap:6px;align-items:center;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end';
+    const pin=document.createElement('button'); pin.className='item-pin-btn task-pin-btn'+(t.pinned?' on':''); pin.type='button'; pin.title=t.pinned?'Unpin task':'Pin task'; pin.textContent=t.pinned?'📌':'📍'; pin.onclick=e=>{e.stopPropagation();toggleOrbitItemPin(t,re);}; actions.append(pin);
+    const reopen=document.createElement('button'); reopen.className='btn ghost sm'; reopen.textContent='Reopen'; reopen.onclick=e=>{e.stopPropagation();t.notDone=false;t.notDoneReason='';t.notDoneAt='';commit();};
+    const done=document.createElement('button'); done.className='btn sm'; done.textContent='Done'; done.onclick=e=>{e.stopPropagation();t.done=true;t.notDone=false;t.notDoneReason='';t.notDoneAt='';t.completedAt=today();syncTaskEvent(t);commit();};
+    const why=document.createElement('button'); why.className='btn ghost sm'; why.textContent='Why?'; why.title=t.notDoneReason||''; why.onclick=e=>{e.stopPropagation();toast(t.notDoneReason||'No reason recorded','info');};
+    actions.append(reopen,done,why);
+    row.append(mark,mid,actions); return row;
+  }
+  taskRow=function(t,re){
+    if(window.__orbitHomeRendering && t && t.notDone) return document.createDocumentFragment();
+    if(t && t.notDone) return notDoneArchiveRow(t,re);
+    return baseTaskRowClean(t,re);
+  };
+
+  // Home: suppress not-done items from the open "On your plate" list and counts.
+  const baseHomeRenderClean = AppHome.render;
+  AppHome.render=function(root,re,st){
+    window.__orbitHomeRendering=true;
+    try { baseHomeRenderClean(root,re,st); }
+    finally { window.__orbitHomeRendering=false; }
+    // Correct the due-today stat so archived/not-done items don't count as open work.
+    root.querySelectorAll('.home-stat').forEach(card=>{
+      const k=card.querySelector('.k');
+      const v=card.querySelector('.v');
+      if(k&&v&&k.textContent.trim()==='Due today'){
+        const n=DB.tasks.filter(t=>!t.done&&!t.notDone&&t.due&&t.due<=today()).length;
+        v.textContent=String(n);
+        const d=card.querySelector('.d'); if(d) d.textContent=n?'tasks waiting':'all clear';
+      }
+    });
+    const onPlate=[...root.querySelectorAll('h3')].find(x=>x.textContent.trim()==='On your plate');
+    if(onPlate){ const area=onPlate.closest('.card'); if(area) area.classList.add('home-task-area'); }
+  };
 })();
 </script>
 </body>
