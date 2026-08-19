@@ -933,6 +933,20 @@ input.persian-text,
 .session-note-body.is-empty{color:var(--muted)}
 .course-session .btn{flex:0 0 auto}
 </style>
+
+<style id="orbit-rich-note-style">
+.rich-note-editor{border:1px solid var(--border);border-radius:15px;overflow:hidden;background:var(--surface-2)}
+.rich-note-toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px;border-bottom:1px solid var(--border);background:var(--surface-3)}
+.rich-note-btn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;padding:6px 8px;font:600 11px var(--font-en);cursor:pointer}
+.rich-note-btn:hover{background:var(--surface)}
+.rich-note-color{width:28px;height:28px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2)}
+.rich-note-editable{min-height:190px;padding:14px;outline:none;color:var(--text);line-height:1.85;font-family:var(--font-en),Georgia,serif}
+.rich-note-editable:empty:before{content:'Start writing…';color:var(--muted);pointer-events:none}
+.rich-note-editable[dir="rtl"]{font-family:var(--font-fa)!important;direction:rtl;text-align:right}
+.rich-note-modal .rich-note-editable{min-height:320px}
+.rich-note-editable ul,.rich-note-editable ol{padding-inline-start:24px}
+.rich-note-editable blockquote{margin:10px 0;padding:8px 12px;border-left:3px solid var(--accent);background:var(--surface-3);border-radius:8px}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -4447,9 +4461,10 @@ function courseList(body, re, st) {
           if(out){c.notes=out.notes||'';commit();}
         }})
       );
-      const body = h('div',{class:'course-notes-body',text:c.notes||'Add notes for this course…'});
+      const body = h('div',{class:'course-notes-body'});
+      body.innerHTML = c.notes ? sanitizeNoteHTML(c.notes) : 'Add notes for this course…';
       if(!c.notes) body.classList.add('is-empty');
-      body.dir = orbitDirection(c.notes||''); body.classList.toggle('persian-text',body.dir==='rtl');
+      body.dir = richDir(c.notes||''); body.classList.toggle('persian-text',body.dir==='rtl');
       wrap.append(titleRow,body);
       return wrap;
     };
@@ -4529,6 +4544,79 @@ function courseDetail(body, c, re, st) {
   if (c.status === 'done') rc.append(h('div', { class: 'tiny', style: { marginTop: '12px' }, text: 'Finished — did it actually deliver that? Worth a line in Notes.' }));
   body.append(rc);
 
+
+<script id="orbit-rich-note-tools">
+function richDir(html){
+  const text=String(html||'').replace(/<[^>]*>/g,' ');
+  return orbitDirection(text);
+}
+function sanitizeNoteHTML(v){
+  const tmp=document.createElement('div');
+  tmp.innerHTML=String(v||'');
+  tmp.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(x=>x.remove());
+  tmp.querySelectorAll('*').forEach(el=>{
+    [...el.attributes].forEach(a=>{
+      if(/^on/i.test(a.name)) el.removeAttribute(a.name);
+      if(a.name==='style'){
+        const safe=a.value.split(';').map(x=>x.trim()).filter(x=>/^(text-align|font-weight|font-style|text-decoration|background-color|color|direction|font-size)\s*:/i.test(x)).join(';');
+        if(safe) el.setAttribute('style',safe); else el.removeAttribute('style');
+      }
+    });
+  });
+  return tmp.innerHTML;
+}
+function makeNoteToolbar(editable){
+  const bar=h('div',{class:'rich-note-toolbar'});
+  const btn=(label,cmd,title)=>h('button',{class:'rich-note-btn',type:'button',text:label,title,onclick:()=>{editable.focus();document.execCommand(cmd,false,null);}});
+  bar.append(
+    btn('B','bold','Bold'),
+    btn('I','italic','Italic'),
+    btn('U','underline','Underline'),
+    btn('S','strikeThrough','Strikethrough'),
+    btn('H','hiliteColor','Highlight'),
+    btn('• List','insertUnorderedList','Bullet list'),
+    btn('1. List','insertOrderedList','Numbered list'),
+    btn('↞','justifyLeft','Align left'),
+    btn('↔','justifyCenter','Center'),
+    btn('↠','justifyRight','Align right'),
+    btn('↕','justifyFull','Justify'),
+    h('input',{type:'color',class:'rich-note-color',title:'Text color',value:'#ffffff',
+      onchange:(e)=>{editable.focus();document.execCommand('foreColor',false,e.target.value);}}),
+    h('input',{type:'color',class:'rich-note-color',title:'Highlight color',value:'#f4d03f',
+      onchange:(e)=>{editable.focus();document.execCommand('hiliteColor',false,e.target.value);}})
+  );
+  return bar;
+}
+function createRichNoteEditor(initial,onChange){
+  const wrap=h('div',{class:'rich-note-editor'});
+  const editable=h('div',{class:'rich-note-editable',contenteditable:'true'});
+  editable.innerHTML=sanitizeNoteHTML(initial||'');
+  editable.dir=richDir(initial||'');
+  editable.classList.toggle('persian-text',editable.dir==='rtl');
+  editable.addEventListener('input',()=>{
+    editable.dir=richDir(editable.innerHTML);
+    editable.classList.toggle('persian-text',editable.dir==='rtl');
+    onChange(sanitizeNoteHTML(editable.innerHTML));
+  });
+  editable.addEventListener('blur',()=>onChange(sanitizeNoteHTML(editable.innerHTML)));
+  wrap.append(makeNoteToolbar(editable),editable);
+  return wrap;
+}
+async function richNoteModal(title,initial){
+  return new Promise(resolve=>{
+    const wrap=h('div',{class:'rich-note-modal'});
+    let value=sanitizeNoteHTML(initial||'');
+    const editor=createRichNoteEditor(value,v=>{value=v;});
+    wrap.append(editor);
+    const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+      h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null);}}),
+      h('button',{class:'btn primary',text:'Save',onclick:()=>{closeModal();resolve(value);}})
+    );
+    modal({title,bodyNode:wrap,footNode:foot,wide:true});
+  });
+}
+</script>
+
   /* General notes + structured session notes */
   c.sessions ||= [];
 
@@ -4561,13 +4649,13 @@ function courseDetail(body, c, re, st) {
     h('div',{class:'spacer'}),
     h('button',{class:'btn primary sm',html:`${icon('plus',13)} Add session`,onclick:async()=>{
       const num=c.sessions.length+1;
-      const o=await formModal('New session note',[
+      const meta=await formModal('New session',[
         {k:'title',label:'Session title',required:true,placeholder:`Session ${num}`},
-        {k:'date',label:'Date',type:'date'},
-        {k:'body',label:'Session notes',type:'textarea',rows:12,placeholder:'What did you learn? What was difficult? Questions? Next steps?'}
-      ],{title:`Session ${num}`,date:today(),body:''});
-      if(o){
-        c.sessions.push({id:uid(),title:o.title,date:o.date||today(),body:o.body||''});
+        {k:'date',label:'Date',type:'date'}
+      ],{title:`Session ${num}`,date:today()});
+      if(meta){
+        const body = await richNoteModal('Session notes', '');
+        c.sessions.push({id:uid(),title:meta.title,date:meta.date||today(),body:body||''});
         commit();
       }
     }})
@@ -4588,22 +4676,27 @@ function courseDetail(body, c, re, st) {
         ),
         h('div',{class:'spacer'}),
         h('button',{class:'btn ghost sm',text:'Edit',onclick:async()=>{
-          const o=await formModal('Edit session note',[
+          const o=await formModal('Edit session',[
             {k:'title',label:'Session title',required:true},
-            {k:'date',label:'Date',type:'date'},
-            {k:'body',label:'Session notes',type:'textarea',rows:12}
-          ],{title:ss.title||`Session ${i+1}`,date:ss.date||today(),body:ss.body||''},{
+            {k:'date',label:'Date',type:'date'}
+          ],{title:ss.title||`Session ${i+1}`,date:ss.date||today()},{
             onDelete:async()=>{
               if(await confirmModal('Delete session?',`"${ss.title||`Session ${i+1}`}" will be removed.`)){
                 c.sessions=c.sessions.filter(x=>x.id!==ss.id); commit();
               }
             }
           });
-          if(o){Object.assign(ss,{title:o.title,date:o.date||'',body:o.body||''});commit();}
+          if(o){
+            const body = await richNoteModal('Session notes', ss.body||'');
+            Object.assign(ss,{title:o.title,date:o.date||'',body:body||''});
+            commit();
+          }
         }})
       );
-      const text=h('div',{class:'session-note-body',text:ss.body||'No notes in this session yet.'});
-      text.dir=orbitDirection(ss.body||'');
+      const text=h('div',{class:'session-note-body'});
+      text.innerHTML = ss.body ? sanitizeNoteHTML(ss.body) : 'No notes in this session yet.';
+      text.dir=richDir(ss.body||'');
+      if(text.dir==='rtl') text.classList.add('persian-text');
       if(!ss.body) text.classList.add('is-empty');
       row.append(head,text);
       list.append(row);
