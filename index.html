@@ -957,6 +957,20 @@ input.persian-text,
 .rich-note-editable a{color:var(--accent);text-decoration:underline}
 
 </style>
+
+<style id="orbit-persian-fonts">
+@import url('https://fonts.googleapis.com/css2?family=Estedad:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Shabnam:wght@400;500;700&display=swap');
+.rich-note-editable, .rich-note-editable * { font-family: Vazirmatn, Estedad, "Noto Naskh Arabic", Shabnam, Tahoma, sans-serif; }
+.rich-note-font-select, .rich-note-size-input, .rich-note-font-btn {
+  height: 34px; border: 1px solid var(--border, #ddd); border-radius: 9px;
+  background: var(--surface, #fff); color: var(--text, #222); padding: 0 9px;
+}
+.rich-note-size-input { width: 58px; text-align:center; }
+.rich-note-font-select { min-width: 135px; }
+.rich-note-size-wrap { display:inline-flex; align-items:center; gap:4px; }
+.rich-note-size-label { font-size:11px; opacity:.7; }
+</style>
+
 </head>
 <body data-wall="aurora">
 <style>
@@ -4328,8 +4342,69 @@ function pillarDetail(body, p, re, st) {
 function richDir(html){const text=String(html||'').replace(/<[^>]*>/g,' ');return orbitDirection(text)}
 function sanitizeNoteHTML(v){const tmp=document.createElement('div');tmp.innerHTML=String(v||'');tmp.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(x=>x.remove());tmp.querySelectorAll('*').forEach(el=>{[...el.attributes].forEach(a=>{if(/^on/i.test(a.name))el.removeAttribute(a.name);if(a.name==='style'){const safe=a.value.split(';').map(x=>x.trim()).filter(x=>/^(text-align|font-weight|font-style|text-decoration|background-color|color|direction|font-size|font-family)\s*:/i.test(x)).join(';');if(safe)el.setAttribute('style',safe);else el.removeAttribute('style')}});if(el.tagName==='A'){const href=el.getAttribute('href')||'';if(!/^https?:\/\//i.test(href))el.removeAttribute('href');el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer')}});return tmp.innerHTML}
 function noteExec(editable,cmd,value=null){editable.focus();try{if(cmd==='createLink'){const url=prompt('Enter URL');if(url)document.execCommand(cmd,false,url)}else{document.execCommand(cmd,false,value)}}catch(e){}editable.dispatchEvent(new Event('input',{bubbles:true}))}
-function makeNoteToolbar(editable){const bar=h('div',{class:'rich-note-toolbar'});const btn=(label,cmd,title)=>h('button',{class:'rich-note-btn',type:'button',text:label,title,onclick:()=>noteExec(editable,cmd)});const select=(title,items,cmd)=>{const s=h('select',{class:'rich-note-select',title});items.forEach(([v,l])=>s.append(h('option',{value:v,text:l})));s.onchange=()=>{if(s.value)noteExec(editable,cmd,s.value);s.value=''};return s};bar.append(btn('↶','undo','Undo'),btn('↷','redo','Redo'),h('span',{class:'rich-note-sep'}),btn('B','bold','Bold'),btn('I','italic','Italic'),btn('U','underline','Underline'),btn('S','strikeThrough','Strikethrough'),h('span',{class:'rich-note-sep'}),select('Text style',[['','Style'],['p','Paragraph'],['h2','Heading 2'],['h3','Heading 3'],['h4','Heading 4']], 'formatBlock'),select('Font size',[['','Size'],['1','Small'],['3','Normal'],['5','Large'],['7','Huge']], 'fontSize'),h('span',{class:'rich-note-sep'}),btn('• List','insertUnorderedList','Bullet list'),btn('1. List','insertOrderedList','Numbered list'),h('button',{class:'rich-note-btn',type:'button',text:'❝',title:'Blockquote',onclick:()=>noteExec(editable,'formatBlock','blockquote')}),h('span',{class:'rich-note-sep'}),btn('←','justifyLeft','Align left'),btn('↔','justifyCenter','Center'),btn('→','justifyRight','Align right'),btn('≋','justifyFull','Justify'),h('span',{class:'rich-note-sep'}),h('label',{class:'rich-note-color-wrap',title:'Text color'},h('span',{text:'A'}),h('input',{type:'color',class:'rich-note-color',value:'#f4f1e8',onchange:e=>noteExec(editable,'foreColor',e.target.value)})),h('label',{class:'rich-note-color-wrap',title:'Highlight color'},h('span',{text:'▰'}),h('input',{type:'color',class:'rich-note-color',value:'#D8B4A0',onchange:e=>noteExec(editable,'hiliteColor',e.target.value)})),h('span',{class:'rich-note-sep'}),btn('↗','createLink','Insert link'),btn('Tx','removeFormat','Clear formatting'));return bar}
-function createRichNoteEditor(initial,onChange){const wrap=h('div',{class:'rich-note-editor'});const editable=h('div',{class:'rich-note-editable',contenteditable:'true',spellcheck:'true'});editable.innerHTML=sanitizeNoteHTML(initial||'');editable.dir=richDir(initial||'');editable.classList.toggle('persian-text',editable.dir==='rtl');const emit=()=>{editable.dir=richDir(editable.innerHTML);editable.classList.toggle('persian-text',editable.dir==='rtl');onChange(sanitizeNoteHTML(editable.innerHTML))};editable.addEventListener('input',emit);editable.addEventListener('blur',emit);wrap.append(makeNoteToolbar(editable),editable);return wrap}
+function makeNoteToolbar(editable){
+  const bar=h('div',{class:'rich-note-toolbar'});
+  const btn=(label,cmd,title)=>h('button',{class:'rich-note-btn',type:'button',text:label,title,onclick:()=>{
+    editable.focus(); document.execCommand(cmd,false,null); editable.dispatchEvent(new Event('input',{bubbles:true}));
+  }});
+  const run=(fn)=>()=>{ editable.focus(); fn(); editable.dispatchEvent(new Event('input',{bubbles:true})); };
+
+  const fontSelect=h('select',{class:'rich-note-font-select',title:'Font',onchange:(e)=>{
+    editable.focus(); document.execCommand('fontName',false,e.target.value);
+    editable.dispatchEvent(new Event('input',{bubbles:true}));
+  }});
+  [
+    ['Vazirmatn','Vazirmatn, sans-serif'],
+    ['Estedad','Estedad, sans-serif'],
+    ['Noto Naskh Arabic','Noto Naskh Arabic, serif'],
+    ['Shabnam','Shabnam, sans-serif'],
+    ['Tahoma','Tahoma, sans-serif'],
+    ['Arial','Arial, sans-serif']
+  ].forEach(([label,value])=>fontSelect.append(h('option',{text:label,value})));
+
+  const sizeWrap=h('span',{class:'rich-note-size-wrap'});
+  const sizeLabel=h('span',{class:'rich-note-size-label',text:'px'});
+  const sizeInput=h('input',{class:'rich-note-size-input',type:'number',min:8,max:96,step:1,value:16,title:'Exact font size in pixels'});
+  const applySize=()=>{
+    const n=Math.max(8,Math.min(96,parseInt(sizeInput.value||16,10)));
+    sizeInput.value=n;
+    editable.focus();
+    const sel=window.getSelection();
+    if(sel && sel.rangeCount){
+      const range=sel.getRangeAt(0);
+      if(!range.collapsed){
+        const span=document.createElement('span');
+        span.style.fontSize=n+'px';
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        sel.removeAllRanges(); const r=document.createRange(); r.selectNodeContents(span); r.collapse(false); sel.addRange(r);
+      } else {
+        document.execCommand('fontSize',false,'7');
+        editable.querySelectorAll('font[size="7"]').forEach(el=>{el.removeAttribute('size');el.style.fontSize=n+'px';});
+      }
+    }
+    editable.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  const sizeBtn=h('button',{class:'rich-note-font-btn',type:'button',text:'Apply',title:'Apply exact font size',onclick:applySize});
+  sizeWrap.append(sizeInput,sizeLabel,sizeBtn);
+
+  bar.append(
+    btn('B','bold','Bold'), btn('I','italic','Italic'), btn('U','underline','Underline'),
+    btn('S','strikeThrough','Strikethrough'),
+    btn('H','hiliteColor','Highlight'),
+    btn('• List','insertUnorderedList','Bullet list'),
+    btn('1. List','insertOrderedList','Numbered list'),
+    btn('↞','justifyLeft','Align left'), btn('↔','justifyCenter','Center'),
+    btn('↠','justifyRight','Align right'), btn('↕','justifyFull','Justify'),
+    fontSelect, sizeWrap,
+    h('input',{type:'color',class:'rich-note-color',title:'Text color',value:'#4b1020',
+      onchange:(e)=>{editable.focus();document.execCommand('foreColor',false,e.target.value);editable.dispatchEvent(new Event('input',{bubbles:true}));}}),
+    h('input',{type:'color',class:'rich-note-color',title:'Highlight color',value:'#f4df9b',
+      onchange:(e)=>{editable.focus();document.execCommand('hiliteColor',false,e.target.value);editable.dispatchEvent(new Event('input',{bubbles:true}));}})
+  );
+  return bar;
+}
+function createRichNoteEditor(initial,onChange){const wrap=h('div',{class:'rich-note-editor'});const editable=h('div',{class:'rich-note-editable',contenteditable:'true',spellcheck:'true'});editable.innerHTML=sanitizeNoteHTML(initial||''); editable.style.fontFamily='Vazirmatn, Estedad, "Noto Naskh Arabic", Shabnam, Tahoma, sans-serif';editable.dir=richDir(initial||'');editable.classList.toggle('persian-text',editable.dir==='rtl');const emit=()=>{editable.dir=richDir(editable.innerHTML);editable.classList.toggle('persian-text',editable.dir==='rtl');onChange(sanitizeNoteHTML(editable.innerHTML))};editable.addEventListener('input',emit);editable.addEventListener('blur',emit);wrap.append(makeNoteToolbar(editable),editable);return wrap}
 async function richNoteModal(title,initial){return new Promise(resolve=>{const wrap=h('div',{class:'rich-note-modal'});let value=sanitizeNoteHTML(initial||'');const editor=createRichNoteEditor(value,v=>{value=v});wrap.append(editor);const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null)}}),h('button',{class:'btn primary',text:'Save note',onclick:()=>{closeModal();resolve(value)}}));modal({title,bodyNode:wrap,footNode:foot,wide:true})})}
 
 /* ============================================================
