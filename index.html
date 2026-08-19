@@ -880,6 +880,59 @@ html[data-theme="light"] .vision-hero::before{opacity:.20}
 <style id="task-pinned-user-friendly">
 .task-section-label{position:sticky;top:0;z-index:3;background:var(--surface);backdrop-filter:blur(8px)}
 </style>
+
+<style id="orbit-lora-vazir-final">
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap');
+:root{
+  --font-en:'Lora',Georgia,serif;
+  --font-fa:'Vazir','Vazirmatn',Tahoma,Arial,sans-serif;
+}
+body,
+button,
+input,
+textarea,
+select{
+  font-family:var(--font-en),Georgia,serif!important;
+}
+.persian-text,
+textarea.persian-text,
+input.persian-text,
+.course-notes-body[dir="rtl"],
+.session-note-body[dir="rtl"]{
+  font-family:var(--font-fa)!important;
+  direction:rtl!important;
+  text-align:right!important;
+}
+</style>
+
+<style id="orbit-course-session-notes">
+.course-sessions-card{overflow:hidden}
+.course-session-empty{
+  min-height:160px;display:flex;align-items:center;justify-content:center;
+  gap:12px;text-align:center;color:var(--muted);
+}
+.course-session-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.course-session{
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+  background:color-mix(in srgb,var(--surface-2) 94%,transparent);
+}
+.course-session-head{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 12px;border-bottom:1px solid var(--border);
+}
+.course-session-title{font-weight:700;font-size:13px}
+.session-note-body{
+  padding:13px;
+  white-space:pre-wrap;
+  line-height:1.8;
+  min-height:80px;
+  font-size:12px;
+}
+.session-note-body.is-empty{color:var(--muted)}
+.course-session .btn{flex:0 0 auto}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -4293,7 +4346,7 @@ async function editCourse(c) {
   if (!out) return;
   out.cost = Number(out.cost) || 0;
   out.color = out.color || defaultColor;
-  if (isNew) { DB.courses.push({ id: uid(), progress: 0, notes: '', ...out }); }
+  if (isNew) { DB.courses.push({ id: uid(), progress: 0, notes: '', sessions: [], ...out }); }
   else Object.assign(DB.courses.find(x => x.id === c.id), out);
   commit();
   toast(isNew ? 'Course added' : 'Course updated');
@@ -4396,7 +4449,7 @@ function courseList(body, re, st) {
       );
       const body = h('div',{class:'course-notes-body',text:c.notes||'Add notes for this course…'});
       if(!c.notes) body.classList.add('is-empty');
-      body.dir = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(c.notes||'') ? 'rtl' : 'ltr';
+      body.dir = orbitDirection(c.notes||''); body.classList.toggle('persian-text',body.dir==='rtl');
       wrap.append(titleRow,body);
       return wrap;
     };
@@ -4476,13 +4529,88 @@ function courseDetail(body, c, re, st) {
   if (c.status === 'done') rc.append(h('div', { class: 'tiny', style: { marginTop: '12px' }, text: 'Finished — did it actually deliver that? Worth a line in Notes.' }));
   body.append(rc);
 
-  const nc = h('div', { class: 'card', style: { marginTop: '14px' } });
-  nc.append(h('h3', { text: 'Notes' }));
-  const ta = h('textarea', { class: 'inp', rows: 5, placeholder: 'What you are learning, what you are stuck on, what you would tell someone considering it.' });
-  ta.value = c.notes || '';
-  ta.oninput = () => { c.notes = ta.value; save(); };
-  nc.append(ta);
-  body.append(nc);
+  /* General notes + structured session notes */
+  c.sessions ||= [];
+
+  const general = h('div', { class: 'card', style: { marginTop: '14px' } });
+  const generalHead = h('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
+    h('h3',{text:'General notes',style:{margin:0}}),
+    h('div',{class:'spacer'}),
+    h('span',{class:'tiny',text:'Free-form notes'})
+  );
+  general.append(generalHead);
+  const generalTa = h('textarea', { class: 'inp', rows: 6, placeholder: 'General notes, ideas, questions, links, things you want to remember…' });
+  generalTa.value = c.notes || '';
+  generalTa.dir = orbitDirection(c.notes || '');
+  generalTa.classList.toggle('persian-text', generalTa.dir==='rtl');
+  generalTa.oninput = () => {
+    c.notes = generalTa.value;
+    generalTa.dir = orbitDirection(generalTa.value);
+    generalTa.classList.toggle('persian-text', generalTa.dir==='rtl');
+    save();
+  };
+  general.append(generalTa);
+  body.append(general);
+
+  const sessionsCard = h('div',{class:'card course-sessions-card',style:{marginTop:'14px'}});
+  const sessionsHead = h('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
+    h('div',{},
+      h('h3',{text:'Session notes',style:{margin:0}}),
+      h('div',{class:'tiny',text:'Keep each lesson / session in its own note.'})
+    ),
+    h('div',{class:'spacer'}),
+    h('button',{class:'btn primary sm',html:`${icon('plus',13)} Add session`,onclick:async()=>{
+      const num=c.sessions.length+1;
+      const o=await formModal('New session note',[
+        {k:'title',label:'Session title',required:true,placeholder:`Session ${num}`},
+        {k:'date',label:'Date',type:'date'},
+        {k:'body',label:'Session notes',type:'textarea',rows:12,placeholder:'What did you learn? What was difficult? Questions? Next steps?'}
+      ],{title:`Session ${num}`,date:today(),body:''});
+      if(o){
+        c.sessions.push({id:uid(),title:o.title,date:o.date||today(),body:o.body||''});
+        commit();
+      }
+    }})
+  );
+  sessionsCard.append(sessionsHead);
+
+  if(!c.sessions.length){
+    sessionsCard.append(h('div',{class:'course-session-empty',html:`<div class="big">${icon('notes',30)}</div><div><strong>No sessions yet</strong><div class="tiny" style="margin-top:4px">Add Session 1 and keep every lesson separate.</div></div>`}));
+  }else{
+    const list=h('div',{class:'course-session-list'});
+    c.sessions.forEach((ss,i)=>{
+      const row=h('div',{class:'course-session'});
+      const head=h('div',{class:'course-session-head'});
+      head.append(
+        h('div',{},
+          h('div',{class:'course-session-title',text:ss.title||`Session ${i+1}`}),
+          h('div',{class:'tiny',text:ss.date?fmtDate(ss.date,{month:'short',day:'numeric',year:'numeric'}):`Session ${i+1}`})
+        ),
+        h('div',{class:'spacer'}),
+        h('button',{class:'btn ghost sm',text:'Edit',onclick:async()=>{
+          const o=await formModal('Edit session note',[
+            {k:'title',label:'Session title',required:true},
+            {k:'date',label:'Date',type:'date'},
+            {k:'body',label:'Session notes',type:'textarea',rows:12}
+          ],{title:ss.title||`Session ${i+1}`,date:ss.date||today(),body:ss.body||''},{
+            onDelete:async()=>{
+              if(await confirmModal('Delete session?',`"${ss.title||`Session ${i+1}`}" will be removed.`)){
+                c.sessions=c.sessions.filter(x=>x.id!==ss.id); commit();
+              }
+            }
+          });
+          if(o){Object.assign(ss,{title:o.title,date:o.date||'',body:o.body||''});commit();}
+        }})
+      );
+      const text=h('div',{class:'session-note-body',text:ss.body||'No notes in this session yet.'});
+      text.dir=orbitDirection(ss.body||'');
+      if(!ss.body) text.classList.add('is-empty');
+      row.append(head,text);
+      list.append(row);
+    });
+    sessionsCard.append(list);
+  }
+  body.append(sessionsCard);
 }
 </script>
 <script>
@@ -6396,6 +6524,7 @@ AppGoals.render=function(root,re,st){
   DB.tasks=(DB.tasks||[]); DB.courses=(DB.courses||[]); DB.habits=(DB.habits||[]);
   DB.tasks.forEach(x=>x.pinned=!!x.pinned);
   DB.courses.forEach(x=>x.pinned=!!x.pinned);
+  DB.courses.forEach(x=>x.sessions ||= []);
   DB.habits.forEach(x=>x.pinned=!!x.pinned);
   Object.values(DB.challenges||{}).forEach(x=>x.pinned=!!x.pinned);
 })();
@@ -6501,6 +6630,13 @@ AppGoals.render=function(root,re,st){
 })();
 </script>
 
+
+<script id="orbit-direction-helper">
+function orbitDirection(text){
+  const v=String(text||'');
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(v)?'rtl':'ltr';
+}
+</script>
 </body>
 </html>
 <script id="orbit-persian-direction">
@@ -6529,36 +6665,4 @@ AppGoals.render=function(root,re,st){
   setTimeout(scan,50);
 })();
 </script>
-<style id="orbit-vazir-course-notes">
-@font-face{
-  font-family:'Vazir';
-  src:local('Vazir'),local('Vazirmatn'),local('Vazir FD');
-  font-style:normal;
-  font-weight:100 900;
-}
-:root{--font-fa:'Vazir','Vazirmatn','Tahoma','Arial',sans-serif;}
-body{font-family:var(--font-fa),system-ui,sans-serif;}
-.persian-text,
-.course-notes-body[dir="rtl"]{
-  font-family:var(--font-fa)!important;
-  direction:rtl!important;
-  text-align:right!important;
-}
-.course-notes-panel{
-  margin-top:12px;
-  border:1px solid var(--border);
-  border-radius:16px;
-  overflow:hidden;
-  background:linear-gradient(145deg,color-mix(in srgb,var(--surface-2) 94%,transparent),var(--surface));
-}
-.course-notes-head{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:10px 12px;border-bottom:1px solid var(--border);
-}
-.course-notes-title{display:flex;align-items:center;gap:7px;font-size:12px;}
-.course-notes-body{
-  min-height:92px;padding:12px;white-space:pre-wrap;
-  line-height:1.75;font-size:12px;color:var(--text);
-}
-.course-notes-body.is-empty{color:var(--muted);}
-</style>
+
