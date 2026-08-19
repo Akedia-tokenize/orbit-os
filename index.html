@@ -859,6 +859,17 @@ html[data-theme="light"] .vision-hero::before{opacity:.20}
 .goal-pinned-node{animation:goalOrbitPulse 5s ease-in-out infinite}
 .goal-pinned-node:nth-of-type(2){animation-delay:.4s}.goal-pinned-node:nth-of-type(3){animation-delay:.8s}.goal-pinned-node:nth-of-type(4){animation-delay:1.2s}.goal-pinned-node:nth-of-type(5){animation-delay:1.6s}.goal-pinned-node:nth-of-type(6){animation-delay:2s}.goal-pinned-node:nth-of-type(7){animation-delay:2.4s}.goal-pinned-node:nth-of-type(8){animation-delay:2.8s}
 </style>
+
+<style id="goal-highlight-contrast">
+.goal-v5 h3 span{
+  display:inline;
+  box-decoration-break:clone;
+  -webkit-box-decoration-break:clone;
+  padding:2px 7px;
+  border-radius:7px;
+  -webkit-text-fill-color:currentColor;
+}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -6091,13 +6102,17 @@ AppGoals.render=function(root,re,st){
     );
     c.append(h('div',{class:'goal-sticker',text:g.sticker||'🎯'}),head);
     const titleColor = g.titleHighlight || '';
+    const darkHighlights = new Set(['#7f1d1d','#7c2d12','#854d0e','#365314','#14532d','#134e4a','#164e63','#1e3a8a','#312e81','#581c87','#701a75','#831843','#3f1d1d','#1f2937','#334155','#4c1d95']);
     const titleSpan = h('span',{text:g.title||'Untitled goal',style:{
       background:titleColor || 'transparent',
+      color:darkHighlights.has(titleColor) ? '#fff' : '',
       padding:titleColor ? '2px 7px' : '0',
-      borderRadius:titleColor ? '6px' : '0',
+      borderRadius:titleColor ? '7px' : '0',
       boxDecorationBreak:'clone',
-      WebkitBoxDecorationBreak:'clone'
+      WebkitBoxDecorationBreak:'clone',
+      textShadow:darkHighlights.has(titleColor) ? '0 1px 2px rgba(0,0,0,.35)' : ''
     }});
+    if(darkHighlights.has(titleColor)) titleSpan.dataset.highlightDepth='dark';
     c.append(h('h3',{},titleSpan));
     c.append(h('div',{class:'goal-kpi'},h('span',{text:g.kpi||g.measurement||'Checklist'}),h('strong',{text:pct+'% complete'})));
     const barColors = [
@@ -6149,7 +6164,11 @@ AppGoals.render=function(root,re,st){
       {k:'priority',label:'Importance',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low']]},
       {k:'titleHighlight',label:'Title highlight',type:'select',options:[
         ['','No highlight'],['#fde68a','Butter yellow'],['#fecaca','Soft red'],['#fed7aa','Peach'],['#bbf7d0','Mint'],
-        ['#bfdbfe','Sky blue'],['#ddd6fe','Lavender'],['#fbcfe8','Rose'],['#bae6fd','Ice blue'],['#d9f99d','Lime']
+        ['#bfdbfe','Sky blue'],['#ddd6fe','Lavender'],['#fbcfe8','Rose'],['#bae6fd','Ice blue'],['#d9f99d','Lime'],
+        ['#7f1d1d','Deep burgundy'],['#7c2d12','Deep rust'],['#854d0e','Deep amber'],['#365314','Deep olive'],
+        ['#14532d','Deep forest'],['#134e4a','Deep teal'],['#164e63','Deep ocean'],['#1e3a8a','Deep navy'],
+        ['#312e81','Deep indigo'],['#581c87','Deep violet'],['#701a75','Deep plum'],['#831843','Deep magenta'],
+        ['#3f1d1d','Deep cocoa'],['#1f2937','Deep graphite'],['#334155','Deep slate'],['#4c1d95','Deep purple-blue']
       ]},
       {k:'scope',label:'Horizon',type:'select',options:GOAL_SCOPES},
       {k:'quarterMonth',label:'Quarter month',type:'select',options:QUARTER_MONTHS.map(m=>[String(m.n),m.name])},
