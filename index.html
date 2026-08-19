@@ -971,6 +971,14 @@ input.persian-text,
 .rich-note-size-label { font-size:11px; opacity:.7; }
 </style>
 
+
+<style id="orbit-search-everything">
+#spot-res{max-height:min(68vh,620px);overflow:auto}
+.spot-item{min-height:52px}
+.spot-item .t{font-weight:650}
+.spot-item .s{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+
 </head>
 <body data-wall="aurora">
 <style>
@@ -4668,7 +4676,7 @@ function courseDetail(body, c, re, st) {
       ],{title:`Session ${num}`,date:today()});
       if(meta){
         const body = await richNoteModal('Session notes', '');
-        c.sessions.push({id:uid(),title:meta.title,date:meta.date||today(),body:body||''});
+        c.sessions.push({id:uid(),title:meta.title,date:meta.date||today(),createdAt:new Date().toISOString(),body:body||''});
         commit();
       }
     }})
@@ -4679,7 +4687,12 @@ function courseDetail(body, c, re, st) {
     sessionsCard.append(h('div',{class:'course-session-empty',html:`<div class="big">${icon('notes',30)}</div><div><strong>No sessions yet</strong><div class="tiny" style="margin-top:4px">Add Session 1 and keep every lesson separate.</div></div>`}));
   }else{
     const list=h('div',{class:'course-session-list'});
-    c.sessions.forEach((ss,i)=>{
+    const orderedSessions = [...c.sessions].sort((a,b)=>{
+      const da = String(a.date || '').localeCompare(String(b.date || ''));
+      if (da !== 0) return -da;
+      return String(b.createdAt || b.id || '').localeCompare(String(a.createdAt || a.id || ''));
+    });
+    orderedSessions.forEach((ss,i)=>{
       const row=h('div',{class:'course-session'});
       const head=h('div',{class:'course-session-head'});
       head.append(
@@ -5958,39 +5971,157 @@ function openSpot() {
 function closeSpot() { $('#spot').classList.remove('open'); }
 $('#spot').addEventListener('click', e => { if (e.target.dataset.close) closeSpot(); });
 
+function spotText(v, depth=0) {
+  if (v == null || depth > 5) return '';
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(x => spotText(x, depth + 1)).join(' ');
+  if (typeof v === 'object') return Object.entries(v)
+    .filter(([k]) => !['id','createdAt','updatedAt','token','accessToken','refreshToken','clientId'].includes(k))
+    .map(([k,val]) => spotText(val, depth + 1)).join(' ');
+  return '';
+}
+function spotMatch(v, q) {
+  return spotText(v).toLocaleLowerCase().includes(q);
+}
+function spotPreview(v, q, fallback='') {
+  const all = spotText(v).replace(/\s+/g,' ').trim();
+  if (!q || !all) return fallback || all.slice(0,70);
+  const low = all.toLocaleLowerCase(), at = low.indexOf(q);
+  if (at < 0) return all.slice(0,90);
+  return (at > 34 ? '…' : '') + all.slice(Math.max(0,at-34), Math.min(all.length,at+90));
+}
+function spotAddRecord(res, item, q, cfg) {
+  if (!item || !spotMatch(item, q)) return;
+  const title = cfg.title(item);
+  const sub = cfg.sub ? cfg.sub(item, q) : spotPreview(item, q, cfg.kind || '');
+  res.push({ ic: cfg.ic, color: cfg.color, t: title, sub, act: cfg.act(item) });
+}
 function runSpot(q) {
-  const s = q.trim().toLowerCase();
+  const s = q.trim().toLocaleLowerCase();
   const res = [];
   const push = (ic, color, t, sub, act) => res.push({ ic, color, t, sub, act });
 
-  APPS.filter(a => !s || a.name.toLowerCase().includes(s)).forEach(a =>
+  // Apps are always searchable by name.
+  APPS.filter(a => !s || a.name.toLocaleLowerCase().includes(s)).forEach(a =>
     push(a.icon, a.color, a.name, 'Open app', () => openApp(a.id)));
 
   if (s) {
-    DB.tasks.filter(t => t.title.toLowerCase().includes(s)).slice(0, 6).forEach(t =>
-      push('tasks', AppTasks.color, t.title, `Task${t.due ? ' · ' + relDay(t.due) : ''}${t.done ? ' · done' : ''}`, () => { openApp('tasks'); editTask(t); }));
-    DB.events.filter(e => e.title.toLowerCase().includes(s)).slice(0, 6).forEach(e =>
-      push('calendar', AppCalendar.color, e.title, `Event · ${fmtDate(e.date)}`, () => { openApp('calendar', { date: e.date }); editEvent(e); }));
-    DB.notes.filter(n => (n.title + n.body).toLowerCase().includes(s)).slice(0, 6).forEach(n =>
-      push('notes', AppNotes.color, n.title || 'Untitled', 'Note · ' + (n.body || '').replace(/\n/g, ' ').slice(0, 46), () => { openApp('notes'); const w = WINS.get('notes'); if (w) { w.state.tab = 'notes'; w.state.sel = n.id; w.rerender(); } }));
-    DB.txns.filter(t => ((t.category || '') + ' ' + (t.note || '')).toLowerCase().includes(s)).slice(0, 5).forEach(t =>
-      push('wallet', AppFinance.color, `${t.category} — ${money(t.amount)}`, `Transaction · ${fmtDate(t.date)}`, () => { openApp('finance'); editTxn(t); }));
-    DB.trips.filter(t => (t.name + ' ' + (t.dest || '')).toLowerCase().includes(s)).slice(0, 4).forEach(t =>
-      push('plane', AppTrips.color, t.name, `Trip · ${fmtDate(t.start)}`, () => openApp('trips', { id: t.id })));
-    DB.habits.filter(hb => hb.name.toLowerCase().includes(s)).slice(0, 4).forEach(hb =>
-      push('flame', AppHabits.color, hb.name, `Habit · ${streakOf(hb)} day streak`, () => openApp('habits')));
-    (DB.vision?.pillars || []).filter(x => (x.name + ' ' + (x.why || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
-      push('compass', AppVision.color, x.name, 'Pillar · Akedia at 25', () => openApp('vision', { id: x.id })));
-    (DB.courses || []).filter(x => (x.name + ' ' + (x.provider || '') + ' ' + (x.reason || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
-      push('cap', AppCourses.color, x.name, `Course · ${stateOf(x.status).label}`, () => openApp('courses', { id: x.id })));
-    (DB.wishlist || []).filter(x => ((x.title || '') + ' ' + (x.why || '')).toLowerCase().includes(s)).slice(0, 4).forEach(x =>
-      push('heart', AppFinance.color, x.title, `Wishlist · ${daysBetween(x.added, today())} days`, () => { openApp('finance'); const w = WINS.get('finance'); if (w) { w.state.tab = 'wish'; w.rerender(); } }));
+    // Tasks: title, category, notes, dates, priority and every stored field.
+    (DB.tasks || []).forEach(t => spotAddRecord(res,t,s,{
+      ic:'tasks',color:AppTasks.color,title:x=>x.title||'Untitled task',
+      kind:'Task',sub:(x,q)=>`Task · ${spotPreview(x,q,'')}${x.due ? ' · ' + relDay(x.due) : ''}${x.done ? ' · done' : ''}`,
+      act:x=>()=>{openApp('tasks');editTask(x);}
+    }));
 
-    push('plus', AppTasks.color, `Add task "${q.trim()}"`, 'Create', () => { const t = quickParse(q.trim()); DB.tasks.push({ id: uid(), done: false, createdAt: today(), ...t }); commit(); toast('Task added'); });
-    push('calendar', AppCalendar.color, `Add event "${q.trim()}"`, 'Create for today', () => editEvent({ title: q.trim(), date: today() }));
+    // Calendar events: title, notes, location and metadata.
+    (DB.events || []).forEach(e => spotAddRecord(res,e,s,{
+      ic:'calendar',color:AppCalendar.color,title:x=>x.title||'Untitled event',
+      kind:'Event',sub:(x,q)=>`Event · ${x.date ? fmtDate(x.date) : ''} · ${spotPreview(x,q,'')}`,
+      act:x=>()=>{openApp('calendar',{date:x.date});editEvent(x);}
+    }));
+
+    // Notes: title, body and all structured note fields.
+    (DB.notes || []).forEach(n => spotAddRecord(res,n,s,{
+      ic:'notes',color:AppNotes.color,title:x=>x.title||'Untitled note',
+      kind:'Note',sub:(x,q)=>`Note · ${spotPreview(x,q,'')}`,
+      act:x=>()=>{openApp('notes');const w=WINS.get('notes');if(w){w.state.tab='notes';w.state.sel=x.id;w.rerender();}}
+    }));
+
+    // Goals: title, KPI, milestones, reviews, blocker, next action, why, etc.
+    (DB.goals || []).forEach(g => spotAddRecord(res,g,s,{
+      ic:'pin',color:AppGoals.color,title:x=>x.title||'Untitled goal',
+      kind:'Goal',sub:(x,q)=>`Goal · ${spotPreview(x,q,'')}${x.deadline?' · '+fmtDate(x.deadline):''}`,
+      act:x=>()=>{openApp('goals');}
+    }));
+
+    // Courses: course-level fields + General Notes + EVERY session title/date/body.
+    (DB.courses || []).forEach(c => {
+      if (spotMatch(c,s)) {
+        push('cap',AppCourses.color,c.name||'Untitled course',
+          `Course · ${stateOf(c.status).label} · ${spotPreview(c,s,'')}`,
+          ()=>openApp('courses',{id:c.id}));
+      }
+      (c.sessions || []).forEach((ss,idx) => {
+        if (!spotMatch(ss,s)) return;
+        push('notes',AppCourses.color,
+          `${c.name || 'Course'} · ${ss.title || `Session ${idx+1}`}`,
+          `Session note · ${ss.date ? fmtDate(ss.date) : ''} · ${spotPreview(ss,s,'')}`,
+          ()=>openApp('courses',{id:c.id}));
+      });
+    });
+
+    // Finance / Investments / wishlist / transaction notes.
+    (DB.txns || []).forEach(t => spotAddRecord(res,t,s,{
+      ic:'wallet',color:AppFinance.color,title:x=>`${x.category || x.type || 'Transaction'}${x.amount != null ? ' — '+money(x.amount) : ''}`,
+      kind:'Transaction',sub:(x,q)=>`Transaction · ${x.date ? fmtDate(x.date) : ''} · ${spotPreview(x,q,'')}`,
+      act:x=>()=>{openApp('finance');editTxn(x);}
+    }));
+    (DB.investments || DB.investmentMovements || []).forEach(t => spotAddRecord(res,t,s,{
+      ic:'wallet',color:AppFinance.color,title:x=>x.name||x.asset||x.type||'Investment movement',
+      kind:'Investment',sub:(x,q)=>`Investment · ${spotPreview(x,q,'')}`,
+      act:x=>()=>openApp('finance')
+    }));
+    (DB.wishlist || []).forEach(x => spotAddRecord(res,x,s,{
+      ic:'heart',color:AppFinance.color,title:x=>x.title||'Wishlist item',
+      kind:'Wishlist',sub:(x,q)=>`Wishlist · ${spotPreview(x,q,'')}`,
+      act:x=>()=>{openApp('finance');const w=WINS.get('finance');if(w){w.state.tab='wish';w.rerender();}}
+    }));
+
+    // Habits, focus sessions, trips, body tracker and challenges.
+    (DB.habits || []).forEach(hb => spotAddRecord(res,hb,s,{
+      ic:'flame',color:AppHabits.color,title:x=>x.name||'Habit',
+      kind:'Habit',sub:(x,q)=>`Habit · ${spotPreview(x,q,'')} · ${streakOf(x)} day streak`,
+      act:x=>()=>openApp('habits')
+    }));
+    (DB.focus || DB.focusSessions || []).forEach(f => spotAddRecord(res,f,s,{
+      ic:'clock',color:AppFocus.color,title:x=>x.title||x.task||'Focus session',
+      kind:'Focus',sub:(x,q)=>`Focus · ${spotPreview(x,q,'')}`,
+      act:x=>()=>openApp('focus')
+    }));
+    (DB.trips || []).forEach(t => spotAddRecord(res,t,s,{
+      ic:'plane',color:AppTrips.color,title:x=>x.name||'Trip',
+      kind:'Trip',sub:(x,q)=>`Trip · ${x.start ? fmtDate(x.start) : ''} · ${spotPreview(x,q,'')}`,
+      act:x=>()=>openApp('trips',{id:x.id})
+    }));
+    DB.challenges && Object.entries(DB.challenges || {}).forEach(([key,ch])=>{
+      if (spotMatch(ch,s)) push('bolt',AppChallenges.color,ch.title||`Challenge · ${key}`,
+        `Challenge · ${spotPreview(ch,s,'')}`,()=>openApp('challenges'));
+    });
+    (DB.body || DB.bodyTracker || DB.bodyLogs || []).forEach(x => spotAddRecord(res,x,s,{
+      ic:'body',color:AppBody.color,title:x=>x.date ? `Body check-in · ${fmtDate(x.date)}` : 'Body check-in',
+      kind:'Body',sub:(x,q)=>`Body · ${spotPreview(x,q,'')}`,
+      act:x=>()=>openApp('body')
+    }));
+
+    // Akedia 25 / Vision: pillar and all nested content.
+    (DB.vision?.pillars || []).forEach(x => spotAddRecord(res,x,s,{
+      ic:'compass',color:AppVision.color,title:x=>x.name||'Pillar',
+      kind:'Pillar · Akedia 25',sub:(x,q)=>`Pillar · ${spotPreview(x,q,'')}`,
+      act:x=>()=>openApp('vision',{id:x.id})
+    }));
+    if (DB.vision && spotMatch(DB.vision,s))
+      push('compass',AppVision.color,'Akedia 25','Vision · '+spotPreview(DB.vision,s,''),()=>openApp('vision'));
+
+    // Generic fallback over remaining top-level DB fields, so new modules are
+    // automatically searchable even if their collection was not explicitly listed.
+    const known = new Set(['tasks','events','notes','goals','courses','txns','investments','investmentMovements','wishlist','habits','focus','focusSessions','trips','challenges','body','bodyTracker','bodyLogs','vision','settings']);
+    Object.entries(DB || {}).forEach(([key,val])=>{
+      if (known.has(key) || !spotMatch(val,s)) return;
+      push('search',AppHome.color,key.replace(/([A-Z])/g,' $1').replace(/^./,m=>m.toUpperCase()),
+        `${key} · ${spotPreview(val,s,'')}`,()=>openApp(key));
+    });
+
+    // Quick-create actions stay at the bottom.
+    push('plus',AppTasks.color,`Add task "${q.trim()}"`,'Create',()=>{
+      const t=quickParse(q.trim());DB.tasks.push({id:uid(),done:false,createdAt:today(),...t});commit();toast('Task added');
+    });
+    push('calendar',AppCalendar.color,`Add event "${q.trim()}"`,'Create for today',
+      ()=>editEvent({title:q.trim(),date:today()}));
   }
 
-  spotItems = res.slice(0, 12);
+  // Search results are intentionally not truncated to 12 internally. The UI
+  // can scroll, and the first 40 strongest results are shown.
+  spotItems = res.slice(0,40);
   spotSel = 0;
   paintSpot();
 }
