@@ -434,6 +434,8 @@ kbd{background:var(--surface-3);border:1px solid var(--border);border-bottom-wid
 .task{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:var(--r-sm);transition:background .12s}
 .task:hover{background:var(--surface-2)}
 .task.done .ttl{text-decoration:line-through;color:var(--muted)}
+.task.skipped .ttl{color:var(--muted)}
+.task.skipped{opacity:.82}
 .cbox{
   width:18px;height:18px;border-radius:99px;border:1.8px solid var(--muted);flex:0 0 auto;margin-top:1px;
   display:grid;place-items:center;transition:background .15s,border-color .15s;
@@ -1947,6 +1949,7 @@ async function editTask(t) {
       { k: 'pri', label: 'Priority', type: 'select', options: PRI.map(p => [p.v, p.name]) }] },
     { k: 'projectId', label: 'Category', type: 'select', options: [['', '— uncategorised —'], ...DB.projects.map(p => [p.id, p.name])] },
     { k: 'notes', label: 'Notes', type: 'textarea', rows: 3, placeholder: 'Optional context' },
+    ...(t.skipped ? [{ k: 'skipReason', label: 'Why was this not done?', type: 'textarea', rows: 3 }] : []),
   ], { pri: 0, ...t }, {
     onDelete: isNew ? null : async () => { DB.tasks = DB.tasks.filter(x => x.id !== t.id); dropTaskEvent(t.id); commit(); toast('Task deleted', 'trash'); }
   });
@@ -1962,13 +1965,35 @@ async function editTask(t) {
 
 function taskRow(t, re) {
   const p = projOf(t.projectId);
-  const row = h('div', { class: 'task' + (t.done ? ' done' : '') });
+  const row = h('div', { class: 'task' + (t.done ? ' done' : '') + (t.skipped ? ' skipped' : '') });
   const cb = h('button', { class: 'cbox' + (t.done ? ' on' : ''), html: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>`, 'aria-label': 'Toggle done' });
   cb.onclick = () => {
-    t.done = !t.done; t.completedAt = t.done ? today() : null;
+    t.done = !t.done;
+    t.skipped = false;
+    t.skipReason = '';
+    t.completedAt = t.done ? today() : null;
     if (t.done) toast('Nice — one down', 'check');
     syncTaskEvent(t);
     commit();
+  };
+  const skipBtn = h('button', {
+    class: 'btn ghost sm',
+    text: t.skipped ? 'Why not done?' : 'Didn’t do',
+    title: t.skipped ? 'View / edit reason' : 'Mark this task as not done and record why'
+  });
+  skipBtn.onclick = async () => {
+    const out = await formModal('Task not done', [
+      { k: 'reason', label: 'Why didn’t you do it?', type: 'textarea', rows: 3, required: true, placeholder: 'Be honest: what got in the way?' }
+    ], { reason: t.skipReason || '' }, { ok: 'Save reason' });
+    if (!out || !String(out.reason || '').trim()) return;
+    t.done = false;
+    t.skipped = true;
+    t.skipReason = String(out.reason).trim();
+    t.skippedAt = today();
+    t.completedAt = null;
+    syncTaskEvent(t);
+    commit();
+    toast('Reason saved', 'notes');
   };
   const mid = h('div', { style: { flex: '1', minWidth: 0, cursor: 'pointer' }, onclick: () => editTask(t) });
   mid.append(h('div', { class: 'ttl', text: t.title }));
@@ -1978,7 +2003,8 @@ function taskRow(t, re) {
   if (p) meta.append(h('span', { class: 'chip', html: `<i class="dot" style="background:${p.color}"></i>${esc(p.name)}` }));
   if (t.notes) meta.append(h('span', { class: 'tiny', html: icon('notes', 12) }));
   if (meta.children.length) mid.append(meta);
-  row.append(cb, mid);
+  if (t.skipped) meta.append(h('span', { class: 'chip', text: 'Not done' }));
+  row.append(cb, mid, skipBtn);
   return row;
 }
 
@@ -1993,10 +2019,11 @@ const AppTasks = {
     /* sidebar */
     const side = h('div', { class: 'side' });
     const counts = {
-      today: DB.tasks.filter(t => !t.done && t.due && t.due <= today()).length,
-      week: DB.tasks.filter(t => !t.done && t.due && daysBetween(today(), t.due) >= 0 && daysBetween(today(), t.due) <= 7).length,
-      all: DB.tasks.filter(t => !t.done).length,
-      none: DB.tasks.filter(t => !t.done && !t.due).length,
+      today: DB.tasks.filter(t => !t.done && !t.skipped && t.due && t.due <= today()).length,
+      week: DB.tasks.filter(t => !t.done && !t.skipped && t.due && daysBetween(today(), t.due) >= 0 && daysBetween(today(), t.due) <= 7).length,
+      all: DB.tasks.filter(t => !t.done && !t.skipped).length,
+      none: DB.tasks.filter(t => !t.done && !t.skipped && !t.due).length,
+      skipped: DB.tasks.filter(t => t.skipped).length,
     };
     const nav = (key, label, ic, cnt) => {
       const b = h('button', { class: 'navitem' + (st.filter === key ? ' active' : ''), onclick: () => { st.filter = key; re(); } });
@@ -2004,11 +2031,12 @@ const AppTasks = {
       return b;
     };
     side.append(nav('today', 'Today', 'bolt', counts.today), nav('week', 'Next 7 days', 'calendar', counts.week),
-      nav('all', 'All open', 'tasks', counts.all), nav('none', 'No date', 'clock', counts.none));
+      nav('all', 'All open', 'tasks', counts.all), nav('none', 'No date', 'clock', counts.none),
+      nav('skipped', 'Not done', 'x', counts.skipped));
     ensureTaskCategories();
     side.append(h('div', { class: 'side-h', text: 'Categories' }));
     DB.projects.forEach(p => {
-      const open = DB.tasks.filter(t => t.projectId === p.id && !t.done).length;
+      const open = DB.tasks.filter(t => t.projectId === p.id && !t.done && !t.skipped).length;
       const b = h('button', { class: 'navitem' + (st.filter === 'p:' + p.id ? ' active' : ''), onclick: () => { st.filter = 'p:' + p.id; re(); } });
       b.innerHTML = `<i class="dot" style="background:${p.color}"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>${open ? `<span class="cnt">${open}</span>` : ''}`;
       b.oncontextmenu = async e => {
@@ -2057,12 +2085,13 @@ const AppTasks = {
 
     let list = DB.tasks.slice();
     let heading = 'All open';
-    if (st.filter === 'today') { list = list.filter(t => t.due && t.due <= today()); heading = 'Today & overdue'; }
-    else if (st.filter === 'week') { list = list.filter(t => t.due && daysBetween(today(), t.due) >= 0 && daysBetween(today(), t.due) <= 7); heading = 'Next 7 days'; }
-    else if (st.filter === 'none') { list = list.filter(t => !t.due); heading = 'No date'; }
+    if (st.filter === 'today') { list = list.filter(t => !t.skipped && t.due && t.due <= today()); heading = 'Today & overdue'; }
+    else if (st.filter === 'week') { list = list.filter(t => !t.skipped && t.due && daysBetween(today(), t.due) >= 0 && daysBetween(today(), t.due) <= 7); heading = 'Next 7 days'; }
+    else if (st.filter === 'none') { list = list.filter(t => !t.skipped && !t.due); heading = 'No date'; }
+    else if (st.filter === 'skipped') { list = list.filter(t => t.skipped); heading = 'Not done'; }
     else if (st.filter.startsWith('p:')) { const p = projOf(st.filter.slice(2)); list = list.filter(t => t.projectId === st.filter.slice(2)); heading = p ? p.name : 'Project'; }
     const doneCount = list.filter(t => t.done).length;
-    if (!st.showDone) list = list.filter(t => !t.done);
+    if (st.filter !== 'skipped' && !st.showDone) list = list.filter(t => !t.done && !t.skipped);
     list.sort(taskSort);
 
     const bar = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px 6px' } });
@@ -3633,8 +3662,16 @@ async function editMilestone(p, m) {
   const isNew = !m || !m.id;
   const out = await formModal(isNew ? 'New milestone' : 'Edit milestone', [
     { k: 'text', label: 'What counts as reached?', required: true, placeholder: 'Something you could show someone' },
-    { k: 'date', label: 'By when', type: 'date' },
-  ], { text: '', date: '', ...(m || {}) }, {
+    { type: 'row', fields: [
+      { k: 'stage', label: 'Stage', type: 'select', options: [
+        ['planned', '1 · Planned'],
+        ['in_progress', '2 · In progress'],
+        ['blocked', '3 · Blocked'],
+        ['done', '4 · Done']
+      ]},
+      { k: 'date', label: 'By when', type: 'date' }
+    ]},
+  ], { text: '', date: '', stage: 'planned', ...(m || {}) }, {
     ok: isNew ? 'Add milestone' : 'Save changes',
     onDelete: isNew ? null : async () => {
       if (await confirmModal('Delete milestone?', `"${m.text}" will be removed.`, 'Delete')) {
@@ -3644,8 +3681,9 @@ async function editMilestone(p, m) {
     }
   });
   if (!out) return;
-  if (isNew) (p.milestones ||= []).push({ id: uid(), text: out.text, date: out.date || '', done: false });
-  else Object.assign(p.milestones.find(x => x.id === m.id), { text: out.text, date: out.date || '' });
+  const stage = out.stage || 'planned';
+  if (isNew) (p.milestones ||= []).push({ id: uid(), text: out.text, date: out.date || '', stage, done: stage === 'done' });
+  else Object.assign(p.milestones.find(x => x.id === m.id), { text: out.text, date: out.date || '', stage });
   commit();
 }
 
@@ -3906,13 +3944,23 @@ function pillarDetail(body, p, re, st) {
   /* milestones */
   const mc = h('div', { class: 'card' });
   mc.append(h('h3', { text: 'Milestones' }));
-  (p.milestones || []).slice().sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999'))).forEach(m => {
+  const milestoneStageRank = { planned: 1, in_progress: 2, blocked: 3, done: 4 };
+  const milestoneStageLabel = { planned: 'Planned', in_progress: 'In progress', blocked: 'Blocked', done: 'Done' };
+  (p.milestones || []).slice().sort((a, b) =>
+    (milestoneStageRank[a.stage || (a.done ? 'done' : 'planned')] || 1) - (milestoneStageRank[b.stage || (b.done ? 'done' : 'planned')] || 1) ||
+    String(a.date || '9999').localeCompare(String(b.date || '9999')) ||
+    String(a.text || '').localeCompare(String(b.text || ''))
+  ).forEach(m => {
+    const stage = m.stage || (m.done ? 'done' : 'planned');
     const row = h('div', { class: 'ck' + (m.done ? ' on' : '') });
     const cb = h('button', { class: 'cbox' + (m.done ? ' on' : ''), style: m.done ? { background: p.color, borderColor: p.color } : {},
       html: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>`,
-      onclick: () => { m.done = !m.done; m.doneOn = m.done ? today() : null; commit(); } });
+      onclick: () => { m.done = !m.done; m.stage = m.done ? 'done' : (m.stage === 'done' ? 'in_progress' : (m.stage || 'planned')); m.doneOn = m.done ? today() : null; commit(); } });
     row.append(cb, h('div', { style: { flex: '1', minWidth: 0 } },
-      h('div', { class: 'cktext', text: m.text, style: { fontSize: '13px' } }),
+      h('div', { style: { display: 'flex', gap: '7px', alignItems: 'center', flexWrap: 'wrap' } },
+        h('div', { class: 'cktext', text: m.text, style: { fontSize: '13px' } }),
+        h('span', { class: 'chip', text: milestoneStageLabel[stage] || stage })
+      ),
       m.date ? h('div', { class: 'tiny', text: m.done ? `reached ${fmtDate(m.doneOn || m.date)}` : `by ${fmtDate(m.date)}` }) : null),
       h('button', { class: 'btn ghost sm', html: icon('edit', 12), title: 'Edit milestone', onclick: () => editMilestone(p, m) }),
       h('button', { class: 'btn ghost sm', html: icon('x', 12), title: 'Delete milestone', onclick: async () => {
