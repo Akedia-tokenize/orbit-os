@@ -4674,7 +4674,7 @@ const AppHome = {
     body.append(hero);
 
     /* quick numbers */
-    const openTasks = DB.tasks.filter(t => !t.done);
+    const openTasks = DB.tasks.filter(t => !t.done && !t.notDone);
     const dueToday = openTasks.filter(t => t.due && t.due <= T);
     const evToday = eventsOn(T);
     const habitsDone = DB.habits.filter(hb => hb.log[T]).length;
@@ -6407,5 +6407,32 @@ AppGoals.render=function(root,re,st){
   };
 })();
 </script>
+
+<style id="home-hide-notdone-final">
+/* Archived "Not done" tasks must never appear on Home. */
+.home-task-area .task.not-done,
+.home-task-area .task.task-notdone,
+.home-task-area .task-archive-row{display:none!important}
+</style>
+<script>
+(function(){
+  const oldHome = AppHome.render;
+  AppHome.render = function(root,re,st){
+    oldHome(root,re,st);
+    const headings=[...root.querySelectorAll('h3')];
+    const head=headings.find(x=>x.textContent.trim()==='On your plate');
+    if(!head) return;
+    const card=head.closest('.card');
+    if(!card) return;
+    card.querySelectorAll('.task, .task-archive-row').forEach(row=>{
+      const txt=row.textContent||'';
+      if(/\\bNot done\\b/i.test(txt) || /\\bWhy\\?\\b/i.test(txt) && row.querySelector('.chip[style*="var(--crit)"]')){
+        row.remove();
+      }
+    });
+  };
+})();
+</script>
+
 </body>
 </html>
