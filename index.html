@@ -5315,7 +5315,112 @@ function startGoogleLoop() {
 /* ============================================================
    REGISTRY · SPOTLIGHT · BOOT
    ============================================================ */
-const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppBody, AppNotes, AppHabits, AppFocus,
+
+/* ============================================================
+   MONTHLY CHALLENGES — standalone page
+   ============================================================ */
+const AppChallenges = {
+  id: 'challenges', name: 'Challenges', icon: 'bolt', color: '#ee6b93', w: 980, h: 700,
+  render(root, re, st) {
+    ensureGoalModel();
+    const key = gregorianMonthKey();
+    const c = DB.challenges[key] || null;
+    const app = h('div', {class:'app'});
+    const head = h('div', {class:'app-head'});
+    head.append(
+      h('div', {}, h('h2', {text:'Challenges'}), h('div', {class:'sub', text:'Monthly challenges, dates, progress and logs'})),
+      h('div', {class:'spacer'}),
+      h('button', {class:'btn primary sm', html:`${icon('plus',13)} New challenge`, onclick:()=>editChallengeStandalone()})
+    );
+    app.append(head);
+    const body = h('div', {class:'app-body'});
+
+    if (!c) {
+      const empty = h('div', {class:'empty', style:{minHeight:'280px'}});
+      empty.append(h('div',{class:'big',text:'⚡'}), h('div',{text:`No monthly challenge for ${monthLabelGregorian(key)} yet.`}),
+        h('button',{class:'btn primary',text:'+ Set challenge',onclick:()=>editChallengeStandalone()}));
+      body.append(empty); app.append(body); root.innerHTML=''; root.append(app); return;
+    }
+
+    const start = c.startDate ? fmtDate(c.startDate,{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const end = c.endDate ? fmtDate(c.endDate,{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const cur = Number(c.current)||0, target = Number(c.target)||0;
+    const pct = target ? Math.max(0,Math.min(100,cur/target*100)) : 0;
+    const logs = Array.isArray(c.progressLog) ? c.progressLog.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.time||'').localeCompare(String(a.time||''))) : [];
+
+    const hero = h('div',{class:'challenge-hero'});
+    hero.append(h('div',{class:'challenge-orb'},icon('bolt',28,1.7)),
+      h('div',{class:'challenge-copy'},
+        h('div',{class:'eyebrow',text:`MONTHLY CHALLENGE · ${monthLabelGregorian(key)}`}),
+        h('h2',{text:c.title||'Monthly challenge'}),
+        h('p',{text:c.why||'Make the month measurable.'}),
+        h('div',{class:'challenge-dates'},
+          h('span',{class:'challenge-date',text:`START · ${start}`}),
+          h('span',{class:'challenge-date',text:`END · ${end}`})
+        ),
+        h('div',{class:'challenge-meta'},
+          h('span',{text:c.metric||'Success metric'}),
+          h('strong',{text:target?`${cur} / ${target} ${c.unit||''}`:String(cur)})
+        ),
+        h('div',{class:'challenge-bar'},h('i',{style:{width:`${pct}%`}}))
+      )
+    );
+    body.append(hero);
+
+    const cards = h('div',{class:'grid',style:{gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))'}});
+    [['Progress',`${Math.round(pct)}%`,'overall'],['Logs',String(logs.length),'entries'],['Target',target?`${cur}/${target}`:String(cur),'current']].forEach(([a,b,d])=>cards.append(h('div',{class:'card'},h('div',{class:'tiny',text:a}),h('div',{style:{fontSize:'24px',fontWeight:'800',marginTop:'4px'},text:b}),h('div',{class:'tiny',text:d}))));
+    body.append(cards);
+
+    const actions = h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',margin:'14px 0'}});
+    actions.append(
+      h('button',{class:'btn sm',html:`${icon('edit',13)} Edit challenge`,onclick:()=>editChallengeStandalone()}),
+      h('button',{class:'btn primary sm',html:`${icon('plus',13)} Log progress`,onclick:()=>logChallengeStandalone()})
+    );
+    body.append(actions);
+
+    const logCard = h('div',{class:'card'});
+    logCard.append(h('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},h('div',{},h('h3',{text:'Progress logs'}),h('div',{class:'tiny',text:`${logs.length} log${logs.length===1?'':'s'} recorded`})),h('div',{class:'spacer'})));
+    if (!logs.length) logCard.append(h('div',{class:'empty',style:{minHeight:'120px'},text:'No progress logs yet.'}));
+    else {
+      logs.forEach((x,i)=>{
+        const row = h('div',{style:{display:'grid',gridTemplateColumns:'110px 70px 1fr auto',gap:'9px',alignItems:'center',padding:'9px 0',borderBottom:'1px solid var(--border)'}});
+        row.append(h('span',{class:'tiny mono',text:x.date?fmtDate(x.date,{month:'short',day:'numeric',year:'numeric'}):'—'}),h('span',{class:'tiny mono',text:x.time||'—'}),h('div',{},h('strong',{text:String(x.value??0)}),x.note?h('div',{class:'tiny',text:x.note}):null),h('button',{class:'btn ghost sm',html:icon('trash',12),onclick:()=>{c.progressLog = logs.slice(); c.progressLog.splice(i,1); c.current = c.progressLog.length ? Number(c.progressLog[0].value)||0 : 0; commit(); re();}}));
+        logCard.append(row);
+      });
+    }
+    body.append(logCard);
+    app.append(body); root.innerHTML=''; root.append(app);
+
+    async function editChallengeStandalone(){
+      const out = await formModal(c?'Edit monthly challenge':'Set monthly challenge',[
+        {k:'title',label:'Challenge',required:true},
+        {type:'row',fields:[{k:'startDate',label:'Start date',type:'date',required:true},{k:'endDate',label:'End date',type:'date',required:true}]},
+        {k:'why',label:'Why this challenge?',type:'textarea',rows:2},
+        {k:'metric',label:'Success metric'},
+        {type:'row',fields:[{k:'target',label:'Target',type:'number',step:'any'},{k:'unit',label:'Unit'}]},
+        {k:'rules',label:'Rules / boundaries',type:'textarea',rows:2},
+        {k:'notes',label:'Notes',type:'textarea',rows:2}
+      ],{id:c?.id||uid(),...(c||{}),startDate:c?.startDate||today(),endDate:c?.endDate||today()});
+      if(!out)return;
+      DB.challenges ||= {};
+      DB.challenges[key] = {...(DB.challenges[key]||{}),...out,key,progressLog:(DB.challenges[key]?.progressLog)||[],current:Number(DB.challenges[key]?.current)||0};
+      commit(); re();
+    }
+    async function logChallengeStandalone(){
+      const out=await formModal('Log challenge progress',[
+        {type:'row',fields:[{k:'date',label:'Date',type:'date',required:true},{k:'time',label:'Time',type:'time',required:true}]},
+        {k:'value',label:'Current value',type:'number',step:'any',required:true},
+        {k:'note',label:'What changed?',type:'textarea',rows:2}
+      ],{date:today(),time:new Date().toTimeString().slice(0,5),value:c.current||0,note:''});
+      if(!out)return;
+      c.current=Number(out.value)||0; c.progressLog ||= [];
+      c.progressLog.push({id:uid(),date:out.date,time:out.time,value:c.current,note:out.note||''});
+      commit(); re();
+    }
+  }
+};
+
+const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppChallenges, AppBody, AppNotes, AppHabits, AppFocus,
   AppFinance, AppCourses, AppTrips,
   Object.assign({ sep: true }, AppSettings)];
 
