@@ -1107,6 +1107,45 @@ input.persian-text,
   color:var(--text)!important;
 }
 </style>
+
+<style id="orbit-reports-v14">
+.report-app{display:flex;flex-direction:column;height:100%;min-height:0}
+.report-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.report-toolbar .seg{display:flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px}
+.report-toolbar .seg button{padding:6px 11px;border-radius:7px;font-size:12px;font-weight:700;color:var(--muted)}
+.report-toolbar .seg button.active{background:var(--accent);color:var(--on-accent)}
+.report-period{display:flex;align-items:center;gap:6px}
+.report-period input{height:30px}
+.report-body{flex:1;min-height:0;overflow:auto;padding:16px}
+.report-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.report-hero h2{margin:0;font-size:18px}.report-hero .sub{color:var(--muted);font-size:12px;margin-top:3px}
+.report-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.report-stat{padding:13px;border:1px solid var(--border);border-radius:13px;background:var(--surface-2)}
+.report-stat .label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800}
+.report-stat .value{font-size:24px;font-weight:800;margin-top:5px}.report-stat .note{font-size:10.5px;color:var(--muted);margin-top:3px}
+.report-section{margin-top:14px}.report-section h3{margin:0 0 9px;font-size:13px}
+.report-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.report-card{padding:13px;border:1px solid var(--border);border-radius:13px;background:var(--surface-2)}
+.report-bars{display:grid;gap:8px}.report-bar-row{display:grid;grid-template-columns:92px 1fr 45px;align-items:center;gap:8px;font-size:11px}
+.report-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.report-bar-track{height:9px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.report-bar-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--plum))}
+.report-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.report-table th{position:sticky;top:0;background:var(--surface-2);padding:7px 6px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+.report-table td{padding:8px 6px;border-bottom:1px solid var(--border)}.report-table tr:last-child td{border-bottom:0}
+.report-good{color:var(--good);font-weight:700}.report-warn{color:var(--warn);font-weight:700}.report-bad{color:var(--crit);font-weight:700}.report-muted{color:var(--muted)}
+.report-empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:13px}
+.report-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:10.5px}
+.report-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
+.report-kpi-line{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11.5px}
+.report-kpi-line:last-child{border-bottom:0}.report-kpi-line strong{font-size:12px}
+@media(max-width:700px){.report-two{grid-template-columns:1fr}.report-bar-row{grid-template-columns:72px 1fr 40px}}
+</style>
+
+<style id="orbit-reports-custom-range-v15">
+.report-toolbar .seg button{min-width:62px}
+.report-period .tiny{font-weight:700}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -2486,7 +2525,7 @@ function taskRow(t, re) {
 }
 
 function ensureTaskStatusFields(){
-  (DB.tasks || []).forEach(t=>{ t.notDone = !!t.notDone; t.notDoneReason ||= ''; t.notDoneAt ||= ''; if(t.done){t.notDone=false;t.notDoneReason='';} });
+  (DB.tasks || []).forEach(t=>{ t.notDone = !!t.notDone; t.notDoneReason ||= ''; t.notDoneAt ||= ''; t.completedAt ||= ''; if(t.done){t.notDone=false;t.notDoneReason='';} });
 }
 
 const AppTasks = {
@@ -4936,6 +4975,166 @@ function courseDetail(body, c, re, st) {
   body.append(sessionsCard);
 }
 </script>
+<script id="orbit-reports-v14-js">
+function reportRange(mode, anchor, customStart, customEnd){
+  const a=fromYmd(anchor||today());
+  if(mode==='custom'){
+    const start=customStart||anchor||today(), end=customEnd||anchor||today();
+    return start<=end ? {start,end}:{start:end,end:start};
+  }
+  if(mode==='day') return {start:ymd(a),end:ymd(a)};
+  if(mode==='week'){
+    const weekStart=Number(DB.settings?.weekStart||0);
+    const day=(a.getDay()-weekStart+7)%7;
+    const start=new Date(a); start.setDate(a.getDate()-day);
+    const end=new Date(start); end.setDate(start.getDate()+6);
+    return {start:ymd(start),end:ymd(end)};
+  }
+  const start=new Date(a.getFullYear(),a.getMonth(),1), end=new Date(a.getFullYear(),a.getMonth()+1,0);
+  return {start:ymd(start),end:ymd(end)};
+}
+function reportDays(start,end){
+  const out=[]; let d=fromYmd(start), z=fromYmd(end);
+  while(d<=z){out.push(ymd(d));d.setDate(d.getDate()+1)}
+  return out;
+}
+function reportInRange(date,start,end){return !!date&&date>=start&&date<=end}
+function reportMinutes(ev){
+  if(!ev||ev.allDay||!ev.start||!ev.end)return 0;
+  const p=s=>{const [h,m]=String(s).split(':').map(Number);return h*60+m};
+  const a=p(ev.start),b=p(ev.end);return b>=a?b-a:1440-a+b;
+}
+function reportFmtMinutes(n){
+  n=Math.max(0,Math.round(n||0));const h=Math.floor(n/60),m=n%60;
+  return h?`${h}h ${m}m`:`${m}m`;
+}
+function reportLabelDay(d){return fmtDate(d,{weekday:'short',month:'short',day:'numeric'})}
+function reportMonthLabel(s){return fmtDate(s,{month:'long',year:'numeric'})}
+function reportShift(mode,anchor,delta){
+  const d=fromYmd(anchor||today());
+  if(mode==='day')d.setDate(d.getDate()+delta);
+  else if(mode==='week')d.setDate(d.getDate()+7*delta);
+  else d.setMonth(d.getMonth()+delta);
+  return ymd(d);
+}
+function reportTaskStatus(t){return t.done?'Completed':t.notDone?'Not done':'Open'}
+
+const AppReports={
+  id:'reports',name:'Reports',icon:'activity',color:'#7b5ac7',w:980,h:700,
+  onArg(arg,re){if(arg?.date)this._cursor=arg.date;if(arg?.mode)this._mode=arg.mode;re&&re()},
+  render(root,re,st){
+    st.mode=st.mode||this._mode||'day';st.anchor=st.anchor||this._cursor||today();this._cursor=null;
+    const range=reportRange(st.mode,st.anchor,st.customStart,st.customEnd), days=reportDays(range.start,range.end), app=h('div',{class:'report-app'});
+    const events=(DB.events||[]).filter(e=>!calHidden(e)&&reportInRange(e.date,range.start,range.end));
+    const tasks=DB.tasks||[];
+    const due=tasks.filter(t=>reportInRange(t.due,range.start,range.end));
+    const completed=tasks.filter(t=>t.done&&reportInRange(t.completedAt,range.start,range.end));
+    const notDone=tasks.filter(t=>t.notDone&&reportInRange(t.notDoneAt,range.start,range.end));
+    const created=tasks.filter(t=>reportInRange(t.createdAt,range.start,range.end));
+    const openDue=due.filter(t=>!t.done&&!t.notDone);
+    const onTime=completed.filter(t=>t.due&&t.completedAt<=t.due);
+    const late=completed.filter(t=>t.due&&t.completedAt>t.due);
+    const unknownCompletion=due.filter(t=>t.done&&!t.completedAt);
+    const eventMinutes=events.reduce((a,e)=>a+reportMinutes(e),0);
+    const title=st.mode==='day'?reportLabelDay(range.start):st.mode==='week'?`${reportLabelDay(range.start)} – ${reportLabelDay(range.end)}`:st.mode==='month'?reportMonthLabel(range.start):`${range.start} – ${range.end}`;
+
+    const toolbar=h('div',{class:'report-toolbar'}),seg=h('div',{class:'seg'});
+    [['day','Daily'],['week','Weekly'],['month','Monthly'],['custom','Custom']].forEach(([k,l])=>seg.append(h('button',{text:l,class:k===st.mode?'active':'',onclick:()=>{st.mode=k;if(k==='custom'){st.customStart=st.customStart||st.anchor||today();st.customEnd=st.customEnd||st.anchor||today();}re()}})));
+    const period=h('div',{class:'report-period'});
+    if(st.mode==='custom'){
+      st.customStart=st.customStart||st.anchor||today();
+      st.customEnd=st.customEnd||st.anchor||today();
+      period.append(
+        h('span',{class:'tiny',text:'From'}),
+        h('input',{type:'date',class:'inp',value:st.customStart,style:{width:'142px'},onchange:e=>{st.customStart=e.target.value||st.customStart;st.anchor=st.customStart;re()}}),
+        h('span',{class:'tiny',text:'To'}),
+        h('input',{type:'date',class:'inp',value:st.customEnd,style:{width:'142px'},onchange:e=>{st.customEnd=e.target.value||st.customEnd;re()}}),
+        h('button',{class:'btn sm',text:'Apply',onclick:()=>{if(st.customStart>st.customEnd){const x=st.customStart;st.customStart=st.customEnd;st.customEnd=x;}st.anchor=st.customStart;re()}}),
+        h('button',{class:'btn ghost sm',text:'Today',onclick:()=>{st.customStart=today();st.customEnd=today();st.anchor=today();re()}})
+      );
+    }else{
+      period.append(
+        h('button',{class:'btn ghost sm',text:'‹',onclick:()=>{st.anchor=reportShift(st.mode,st.anchor,-1);re()}}),
+        h('input',{type:'date',class:'inp',value:st.anchor,style:{width:'142px'},onchange:e=>{st.anchor=e.target.value||today();re()}}),
+        h('button',{class:'btn ghost sm',text:'›',onclick:()=>{st.anchor=reportShift(st.mode,st.anchor,1);re()}}),
+        h('button',{class:'btn sm',text:'Today',onclick:()=>{st.anchor=today();re()}})
+      );
+    }
+    toolbar.append(seg,period,h('div',{class:'spacer'}),h('button',{class:'btn sm',text:'Export CSV',onclick:()=>exportReportCSV(range)}));
+    app.append(toolbar);
+
+    const body=h('div',{class:'report-body'});
+    body.append(h('div',{class:'report-hero'},
+      h('div',{},h('h2',{text:`Activity report · ${title}`}),h('div',{class:'sub',text:'Calendar + Tasks — measured only from saved records.'})),
+      h('div',{class:'tiny',text:`${range.start} → ${range.end}`})
+    ));
+
+    const stats=h('div',{class:'report-stat-grid'});
+    const addStat=(l,v,n,cls='')=>stats.append(h('div',{class:'report-stat'},h('div',{class:'label',text:l}),h('div',{class:'value'+(cls?' '+cls:''),text:String(v)}),h('div',{class:'note',text:n})));
+    const rate=due.length?Math.round(completed.length/due.length*100):0;
+    addStat('Calendar events',events.length,`${new Set(events.map(e=>e.date)).size} active day(s)`);
+    addStat('Scheduled time',reportFmtMinutes(eventMinutes),`${events.filter(e=>!e.allDay&&e.start&&e.end).length} timed event(s)`);
+    addStat('Tasks due',due.length,`${created.length} task(s) created`);
+    addStat('Tasks completed',completed.length,`${rate}% of due tasks`);
+    addStat('On time',onTime.length,`${late.length} late completion(s)`,late.length?'report-warn':'report-good');
+    addStat('Still open',openDue.length,`${notDone.length} marked not done`,openDue.length?'report-warn':'report-good');
+    body.append(stats);
+
+    const rows=days.map(day=>{
+      const ev=events.filter(e=>e.date===day), td=due.filter(t=>t.due===day), dn=completed.filter(t=>t.completedAt===day), nd=notDone.filter(t=>t.notDoneAt===day);
+      return {day,events:ev.length,eventMinutes:ev.reduce((a,e)=>a+reportMinutes(e),0),due:td.length,done:dn.length,notDone:nd.length,open:td.filter(t=>!t.done&&!t.notDone).length}
+    });
+    const section=h('div',{class:'report-section'});section.append(h('h3',{text:st.mode==='day'?'Day summary':st.mode==='week'?'Daily breakdown':'Daily breakdown'}));
+    const card=h('div',{class:'report-card'});
+    const table=h('table',{class:'report-table'});
+    table.innerHTML='<thead><tr><th>Date</th><th>Events</th><th>Time</th><th>Due</th><th>Done</th><th>Not done</th><th>Open</th></tr></thead>';
+    const tb=h('tbody');
+    const showRows=rows.filter(r=>st.mode==='day'||r.events||r.due||r.done||r.notDone);
+    if(!showRows.length){card.append(h('div',{class:'report-empty',text:'No Calendar or Task activity in this range.'}))}
+    else{showRows.forEach(r=>{const tr=h('tr');tr.innerHTML=`<td>${esc(st.mode==='day'?'Selected day':reportLabelDay(r.day))}</td><td>${r.events}</td><td>${reportFmtMinutes(r.eventMinutes)}</td><td>${r.due}</td><td class="${r.done?'report-good':''}">${r.done}</td><td class="${r.notDone?'report-bad':''}">${r.notDone}</td><td class="${r.open?'report-warn':''}">${r.open}</td>`;tb.append(tr)});table.append(tb);card.append(table)}
+    section.append(card);body.append(section);
+
+    const two=h('div',{class:'report-two report-section'});
+    const calCard=h('div',{class:'report-card'});calCard.append(h('h3',{text:'Calendar load'}));
+    const evBars=h('div',{class:'report-bars'}), maxEv=Math.max(1,...rows.map(r=>r.events));
+    rows.filter(r=>st.mode==='day'||r.events).forEach(r=>{const row=h('div',{class:'report-bar-row'});row.append(h('div',{class:'report-bar-label',text:st.mode==='day'?'Selected day':reportLabelDay(r.day)}),h('div',{class:'report-bar-track'},h('div',{class:'report-bar-fill',style:{width:(r.events/maxEv*100)+'%'}})),h('div',{class:'mono',text:String(r.events)}));evBars.append(row)});
+    if(!evBars.children.length)evBars.append(h('div',{class:'report-muted',text:'No calendar events.'}));calCard.append(evBars);
+    const allDay=events.filter(e=>e.allDay).length;calCard.append(h('div',{class:'report-legend'},h('span',{text:`${allDay} all-day`}),h('span',{text:`${events.length-allDay} timed/other`}),h('span',{text:`${reportFmtMinutes(eventMinutes)} scheduled`})));two.append(calCard);
+
+    const taskCard=h('div',{class:'report-card'});taskCard.append(h('h3',{text:'Task outcomes'}));
+    const outcome=[['Completed',completed.length,'var(--good)'],['Open',openDue.length,'var(--warn)'],['Not done',notDone.length,'var(--crit)'],['Due',due.length,'var(--accent)']],maxO=Math.max(1,...outcome.map(x=>x[1])),ob=h('div',{class:'report-bars'});
+    outcome.forEach(([label,val,col])=>{const row=h('div',{class:'report-bar-row'});row.append(h('div',{class:'report-bar-label',text:label}),h('div',{class:'report-bar-track'},h('div',{class:'report-bar-fill',style:{width:(val/maxO*100)+'%',background:col}})),h('div',{class:'mono',text:String(val)}));ob.append(row)});
+    taskCard.append(ob);
+    const meta=h('div',{style:{marginTop:'10px'}});
+    meta.append(h('div',{class:'report-kpi-line'},h('span',{text:'On-time completion'}),h('strong',{text:onTime.length+late.length?`${Math.round(onTime.length/(onTime.length+late.length)*100)}%`:'—'})));
+    meta.append(h('div',{class:'report-kpi-line'},h('span',{text:'Overdue at period end'}),h('strong',{class:openDue.some(t=>t.due<range.end)?'report-warn':'',text:String(openDue.filter(t=>t.due&&t.due<range.end).length)})));
+    meta.append(h('div',{class:'report-kpi-line'},h('span',{text:'Done without completion date'}),h('strong',{class:unknownCompletion.length?'report-warn':'',text:String(unknownCompletion.length)})));
+    taskCard.append(meta);two.append(taskCard);body.append(two);
+
+    const detail=h('div',{class:'report-section'});detail.append(h('h3',{text:'Task details'}));
+    const dc=h('div',{class:'report-card'});
+    const relevant=[...completed.map(t=>({t,status:'Completed'})),...openDue.map(t=>({t,status:'Open'})),...notDone.map(t=>({t,status:'Not done'}))]
+      .sort((a,b)=>String(a.t.due||a.t.completedAt||a.t.notDoneAt||'').localeCompare(String(b.t.due||b.t.completedAt||b.t.notDoneAt||'')));
+    if(!relevant.length)dc.append(h('div',{class:'report-empty',text:'No task records in this range.'}));
+    else{
+      const t=h('table',{class:'report-table'});t.innerHTML='<thead><tr><th>Task</th><th>Due</th><th>Completed</th><th>Status</th><th>Category</th></tr></thead>';
+      const tb2=h('tbody');
+      relevant.slice(0,150).forEach(({t:task,status})=>{const tr=h('tr');const cat=task.category||((DB.projects||[]).find(p=>p.id===task.projectId)?.name||'—');tr.innerHTML=`<td>${esc(task.title||'Untitled task')}</td><td>${esc(task.due||'—')}</td><td>${esc(task.completedAt||'—')}</td><td class="${status==='Completed'?'report-good':status==='Not done'?'report-bad':'report-warn'}">${status}</td><td>${esc(cat)}</td>`;tb2.append(tr)});
+      t.append(tb2);dc.append(t);
+    }
+    detail.append(dc);body.append(detail);app.append(body);root.append(app);
+  }
+};
+
+function exportReportCSV(range){
+  const rows=[['Type','Date','Title','Due','Completed','Status','Minutes']];
+  (DB.events||[]).filter(e=>!calHidden(e)&&reportInRange(e.date,range.start,range.end)).forEach(e=>rows.push(['Calendar',e.date,e.title||'','','','',reportMinutes(e)]));
+  (DB.tasks||[]).filter(t=>reportInRange(t.due,range.start,range.end)||reportInRange(t.completedAt,range.start,range.end)||reportInRange(t.notDoneAt,range.start,range.end)).forEach(t=>rows.push(['Task',t.due||t.completedAt||t.notDoneAt||'',t.title||'',t.due||'',t.completedAt||'',reportTaskStatus(t),'']));
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download=`orbit-report-${range.start}-to-${range.end}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+</script>
+
 <script>
 /* ============================================================
    GOALS — this week, this month, this year
@@ -6157,7 +6356,7 @@ const AppChallenges = {
   }
 };
 
-const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppGoals, AppChallenges, AppBody, AppNotes, AppHabits, AppFocus,
+const APPS = [AppHome, AppVision, AppCalendar, AppTasks, AppReports, AppGoals, AppChallenges, AppBody, AppNotes, AppHabits, AppFocus,
   AppFinance, AppCourses, AppTrips,
   Object.assign({ sep: true }, AppSettings)];
 
