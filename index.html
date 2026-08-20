@@ -1008,6 +1008,13 @@ input.persian-text,
 .trait.persian-text span{font-family:var(--font-fa)!important}
 .session-orb .orb-title[dir="rtl"]{font-family:var(--font-fa)!important;direction:rtl;text-align:center}
 .course-session-actions-link{font-size:10px}
+.session-orb{border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));text-decoration:none;color:inherit}
+.session-orb.has-session-link{cursor:pointer}
+.session-orb.has-session-link .orb-link-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent)}
+.session-orb.has-session-link:hover .orb-link-icon{transform:scale(1.08);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.session-orb .orb-link-icon{transition:transform .16s ease,background .16s ease}
+.course-session-link-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:999px;font-size:9px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.course-session-link-badge.muted{color:var(--muted);background:transparent;border-color:var(--border)}
 </style>
 </head>
 <body data-wall="aurora">
@@ -4785,19 +4792,29 @@ function courseDetail(body, c, re, st) {
       const head=h('div',{class:'course-session-head'});
       const title=ss.title||`Session ${i+1}`;
       const initials=title.trim().slice(0,2).toUpperCase();
-      const orb=h('div',{class:'session-orb',title:'Open and edit notes',onclick:async()=>{
+      /* The session orb is now the direct-link target. If a session has a URL,
+         clicking the circle opens that exact page in a new tab. If no URL exists,
+         the circle keeps its useful fallback behavior and opens the session notes. */
+      const openNotes=async()=>{
         const body=await richNoteModal(`${title} — Rich Notes`,ss.body||'');
         if(body!==null){ss.body=body;commit();}
-      }});
+      };
+      const orb=h(ss.link ? 'a' : 'button',{
+        class:'session-orb'+(ss.link?' has-session-link':''),
+        title:ss.link?'Open session link':'Open and edit notes',
+        ...(ss.link?{href:ss.link,target:'_blank',rel:'noopener noreferrer'}:{type:'button',onclick:openNotes})
+      });
       orb.append(
         h('span',{class:'orb-dot'}),
-        h('span',{class:'orb-title',text:initials.length<3?title:initials,dir:orbitDirection(title)})
+        ss.link
+          ? h('span',{class:'orb-link-icon',html:icon('link',24),'aria-hidden':'true'})
+          : h('span',{class:'orb-title',text:initials.length<3?title:initials,dir:orbitDirection(title)})
       );
       head.append(
         orb,
         h('div',{class:'session-orb-date',text:ss.date?fmtDate(ss.date,{month:'short',day:'numeric',year:'numeric'}):`Session ${i+1}`}),
         h('div',{class:'session-orb-actions'},
-          ss.link ? h('a',{class:'btn ghost sm course-session-actions-link',href:ss.link,target:'_blank',rel:'noopener noreferrer',html:`${icon('link',12)} Link`,onclick:e=>e.stopPropagation()}) : null,
+          ss.link ? h('span',{class:'course-session-link-badge',html:`${icon('link',11)} Linked`}) : h('span',{class:'course-session-link-badge muted',text:'No link'}),
           h('button',{class:'btn ghost sm',text:'Edit session',onclick:async()=>{
             const o=await formModal('Edit session',[
               {k:'title',label:'Session title',required:true},
