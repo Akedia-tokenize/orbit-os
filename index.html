@@ -981,37 +981,131 @@ input.persian-text,
 </style>
 
 
-<style id="orbit-session-orbs-v7">
-.course-session-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:18px 14px;margin-top:16px;align-items:start}
-.course-session{border:0!important;background:transparent!important;overflow:visible!important;min-width:0}
-.course-session-head{display:flex;flex-direction:column;align-items:center;gap:7px;padding:0!important;border:0!important}
-.session-orb{width:78px;height:78px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;box-sizing:border-box;cursor:pointer;position:relative;border:1.5px solid color-mix(in srgb,var(--accent) 34%,var(--border));background:radial-gradient(circle at 32% 24%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 52%),var(--surface-2);box-shadow:0 7px 18px rgba(35,20,35,.08),inset 0 1px 0 rgba(255,255,255,.5);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;text-decoration:none;color:inherit}
-.session-orb:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 11px 24px rgba(35,20,35,.13)}
-.session-orb .orb-title{font-size:11px;line-height:1.25;font-weight:800;max-width:58px;max-height:43px;overflow:hidden}
-.session-orb .orb-dot{position:absolute;right:7px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent)}
-.session-orb .orb-link-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent)}
-.session-orb.has-session-link .orb-link-icon{transition:transform .16s ease,background .16s ease}
-.session-orb.has-session-link:hover .orb-link-icon{transform:scale(1.08);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.session-orb-date{font-size:10px;color:var(--muted);text-align:center;min-height:13px}
-.session-orb-actions{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;max-width:132px}
-.session-orb-actions .btn{font-size:10px;padding:5px 7px}
+<style id="orbit-session-orbs-v13">
+.course-session-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  gap:22px 18px;
+  margin-top:18px;
+  align-items:start;
+  padding:2px 0 8px;
+}
+.course-session{
+  border:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+  min-width:0;
+}
+.course-session-head{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  padding:0!important;
+  border:0!important;
+}
+.session-orb{
+  width:100px;
+  height:100px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:12px;
+  box-sizing:border-box;
+  cursor:pointer;
+  position:relative;
+  border:1.5px solid color-mix(in srgb,var(--accent) 34%,var(--border));
+  background:
+    radial-gradient(circle at 32% 24%,color-mix(in srgb,var(--accent) 19%,transparent),transparent 54%),
+    var(--surface-2);
+  box-shadow:0 8px 22px rgba(35,20,35,.09),inset 0 1px 0 rgba(255,255,255,.5);
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+  text-decoration:none;
+  color:inherit;
+}
+.session-orb:hover{
+  transform:translateY(-2px) scale(1.025);
+  border-color:var(--accent);
+  box-shadow:0 13px 28px rgba(35,20,35,.14);
+}
+.session-orb .orb-title{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:3;
+  overflow:hidden;
+  font-size:12px;
+  line-height:1.3;
+  font-weight:800;
+  max-width:76px;
+  max-height:48px;
+}
+.session-orb .orb-dot{
+  position:absolute;
+  right:9px;
+  top:9px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent);
+}
+.session-orb-date{
+  font-size:10px;
+  color:var(--muted);
+  text-align:center;
+  min-height:13px;
+}
+.session-orb-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  justify-content:center;
+  max-width:170px;
+}
+.session-orb-actions .btn{
+  font-size:10px;
+  padding:5px 8px;
+  min-height:27px;
+}
+.session-orb-actions .course-session-link-btn{
+  width:100%;
+  justify-content:center;
+}
+.session-orb .orb-link-icon{display:none!important}
 .session-note-body{display:none!important}
 .course-session-link-badge{display:none!important}
-.session-link-field{direction:ltr!important;text-align:left!important;font-family:var(--font-en)!important}
-@media(max-width:620px){.course-session-list{grid-template-columns:repeat(2,minmax(112px,1fr));gap:16px 8px}.session-orb{width:72px;height:72px}}
+.session-link-field{
+  direction:ltr!important;
+  text-align:left!important;
+  font-family:var(--font-en)!important;
+}
+@media(max-width:620px){
+  .course-session-list{
+    grid-template-columns:repeat(2,minmax(135px,1fr));
+    gap:18px 10px;
+  }
+  .session-orb{width:92px;height:92px}
+}
 </style>
 
-<style id="orbit-final-polish-v10">
+<style id="orbit-final-polish-v13">
 .trait.persian-text{font-family:var(--font-fa)!important;direction:rtl!important;text-align:right!important;unicode-bidi:plaintext}
 .trait.persian-text span{font-family:var(--font-fa)!important}
 .session-orb .orb-title[dir="rtl"]{font-family:var(--font-fa)!important;direction:rtl;text-align:center}
-.course-session-actions-link{font-size:10px}
-.session-orb{border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));text-decoration:none;color:inherit}
+.session-orb{border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border))}
 .session-orb.has-session-link{cursor:pointer}
-.session-orb.has-session-link .orb-link-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent)}
-.session-orb.has-session-link:hover .orb-link-icon{transform:scale(1.08);background:color-mix(in srgb,var(--accent) 16%,transparent)}
-.session-orb .orb-link-icon{transition:transform .16s ease,background .16s ease}
-.course-session-link-badge{display:none!important}
+.course-session-link-btn{
+  background:var(--surface-3)!important;
+  border:1px solid var(--border)!important;
+  color:var(--text)!important;
+}
+.course-session-link-btn:hover{
+  background:var(--accent-soft)!important;
+  border-color:color-mix(in srgb,var(--accent) 35%,var(--border))!important;
+  color:var(--text)!important;
+}
 </style>
 </head>
 <body data-wall="aurora">
@@ -4756,7 +4850,7 @@ function courseDetail(body, c, re, st) {
   const sessionsHead = h('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
     h('div',{},
       h('h3',{text:'Session notes',style:{margin:0}}),
-      h('div',{class:'tiny',text:'Keep each lesson / session in its own note.'})
+      h('div',{class:'tiny',text:'Keep each lesson / session in its own note. The circle shows the full session name; the link button opens the resource.'})
     ),
     h('div',{class:'spacer'}),
     h('button',{class:'btn primary sm',html:`${icon('plus',13)} Add session`,onclick:async()=>{
@@ -4764,7 +4858,7 @@ function courseDetail(body, c, re, st) {
       const meta=await formModal('New session',[
         {k:'title',label:'Session title',required:true,placeholder:`Session ${num}`},
         {k:'date',label:'Date',type:'date'},
-        {k:'link',label:'🔗 Direct link',type:'url',placeholder:'https://drive.google.com/...',hint:'Paste the full URL. The circle will open this link directly.'}
+        {k:'link',label:'🔗 Session link',type:'url',placeholder:'https://drive.google.com/...',hint:'Paste the Google Drive / YouTube / PDF / website URL.'}
       ],{title:`Session ${num}`,date:today(),link:''});
       if(meta){
         const body = await richNoteModal('Session notes', '');
@@ -4788,24 +4882,19 @@ function courseDetail(body, c, re, st) {
       const row=h('div',{class:'course-session'});
       const head=h('div',{class:'course-session-head'});
       const title=ss.title||`Session ${i+1}`;
-      const initials=title.trim().slice(0,2).toUpperCase();
-      /* The session orb is now the direct-link target. If a session has a URL,
-         clicking the circle opens that exact page in a new tab. If no URL exists,
-         the circle keeps its useful fallback behavior and opens the session notes. */
       const openNotes=async()=>{
         const body=await richNoteModal(`${title} — Rich Notes`,ss.body||'');
         if(body!==null){ss.body=body;commit();}
       };
-      const orb=h(ss.link ? 'a' : 'button',{
+      const orb=h('button',{
         class:'session-orb'+(ss.link?' has-session-link':''),
-        title:ss.link?'Open session link':'Open and edit notes',
-        ...(ss.link?{href:ss.link,ariaLabel:'Open direct session link'}:{type:'button',onclick:openNotes})
+        type:'button',
+        title:'Open and edit notes',
+        onclick:openNotes
       });
       orb.append(
         h('span',{class:'orb-dot'}),
-        ss.link
-          ? h('span',{class:'orb-link-icon',html:icon('link',18),'aria-hidden':'true'})
-          : h('span',{class:'orb-title',text:initials.length<3?title:initials,dir:orbitDirection(title)})
+        h('span',{class:'orb-title',text:title,dir:orbitDirection(title)})
       );
       head.append(
         orb,
@@ -4815,7 +4904,7 @@ function courseDetail(body, c, re, st) {
             const o=await formModal('Edit session',[
               {k:'title',label:'Session title',required:true},
               {k:'date',label:'Date',type:'date'},
-              {k:'link',label:'🔗 Direct link',type:'url',placeholder:'https://drive.google.com/...',hint:'Paste the full URL. The circle will open this link directly.'}
+              {k:'link',label:'🔗 Session link',type:'url',placeholder:'https://drive.google.com/...',hint:'Paste the Google Drive / YouTube / PDF / website URL.'}
             ],{title:ss.title||`Session ${i+1}`,date:ss.date||today(),link:ss.link||''},{
               onDelete:async()=>{
                 if(await confirmModal('Delete session?',`"${ss.title||`Session ${i+1}`}" will be removed.`)){
@@ -4828,7 +4917,15 @@ function courseDetail(body, c, re, st) {
           h('button',{class:'btn primary sm',html:`${icon('edit',13)} Notes`,onclick:async()=>{
             const body=await richNoteModal(`${title} — Rich Notes`,ss.body||'');
             if(body!==null){ss.body=body;commit();}
-          }})
+          }}),
+          ss.link ? h('a',{
+            class:'btn ghost sm course-session-link-btn',
+            href:ss.link,
+            target:'_blank',
+            rel:'noopener noreferrer',
+            html:`${icon('link',12)} Open link`,
+            title:'Open this session link'
+          }) : null
         )
       );
       row.append(head);
