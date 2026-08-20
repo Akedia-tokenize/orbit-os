@@ -1146,6 +1146,12 @@ input.persian-text,
 .report-toolbar .seg button{min-width:62px}
 .report-period .tiny{font-weight:700}
 </style>
+
+<style id="orbit-reports-v16-extra">
+.report-stat .value.report-good{color:var(--good)}
+.report-stat .value.report-warn{color:var(--warn)}
+.report-stat .value.report-bad{color:var(--crit)}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -5018,14 +5024,33 @@ function reportShift(mode,anchor,delta){
   return ymd(d);
 }
 function reportTaskStatus(t){return t.done?'Completed':t.notDone?'Not done':'Open'}
+const REPORT_EXCLUDED_CALENDARS = new Set(['hobbys','break','failure','mandatory']);
+function reportCalendarName(e){
+  const id=e?.gcal||e?.calendarId||e?.calId||'';
+  const gc=(DB.gcals||[]).find(c=>c.id===id);
+  return String(gc?.name||e?.calendarName||id||'Unknown').trim() || 'Unknown';
+}
+function reportCalendarExcluded(name){
+  return REPORT_EXCLUDED_CALENDARS.has(String(name||'').trim().toLowerCase());
+}
+function reportTaskCategoryName(t){
+  const p=(DB.projects||[]).find(x=>x.id===t.projectId);
+  return String(p?.name||t.category||'Uncategorised').trim() || 'Uncategorised';
+}
+function reportPriorityName(t){
+  const p=PRI.find(x=>Number(x.v)===Number(t?.pri));
+  return p?.name||'None';
+}
 
 const AppReports={
-  id:'reports',name:'Reports',icon:'activity',color:'#7b5ac7',w:980,h:700,
+  id:'reports',name:'Reports',icon:'grid',color:'#7b5ac7',w:980,h:700,
   onArg(arg,re){if(arg?.date)this._cursor=arg.date;if(arg?.mode)this._mode=arg.mode;re&&re()},
   render(root,re,st){
     st.mode=st.mode||this._mode||'day';st.anchor=st.anchor||this._cursor||today();this._cursor=null;
     const range=reportRange(st.mode,st.anchor,st.customStart,st.customEnd), days=reportDays(range.start,range.end), app=h('div',{class:'report-app'});
     const events=(DB.events||[]).filter(e=>!calHidden(e)&&reportInRange(e.date,range.start,range.end));
+    const usefulEvents=events.filter(e=>!reportCalendarExcluded(reportCalendarName(e)));
+    const excludedEvents=events.filter(e=>reportCalendarExcluded(reportCalendarName(e)));
     const tasks=DB.tasks||[];
     const due=tasks.filter(t=>reportInRange(t.due,range.start,range.end));
     const completed=tasks.filter(t=>t.done&&reportInRange(t.completedAt,range.start,range.end));
@@ -5036,6 +5061,8 @@ const AppReports={
     const late=completed.filter(t=>t.due&&t.completedAt>t.due);
     const unknownCompletion=due.filter(t=>t.done&&!t.completedAt);
     const eventMinutes=events.reduce((a,e)=>a+reportMinutes(e),0);
+    const usefulMinutes=usefulEvents.reduce((a,e)=>a+reportMinutes(e),0);
+    const excludedMinutes=excludedEvents.reduce((a,e)=>a+reportMinutes(e),0);
     const title=st.mode==='day'?reportLabelDay(range.start):st.mode==='week'?`${reportLabelDay(range.start)} – ${reportLabelDay(range.end)}`:st.mode==='month'?reportMonthLabel(range.start):`${range.start} – ${range.end}`;
 
     const toolbar=h('div',{class:'report-toolbar'}),seg=h('div',{class:'seg'});
@@ -5074,6 +5101,7 @@ const AppReports={
     const rate=due.length?Math.round(completed.length/due.length*100):0;
     addStat('Calendar events',events.length,`${new Set(events.map(e=>e.date)).size} active day(s)`);
     addStat('Scheduled time',reportFmtMinutes(eventMinutes),`${events.filter(e=>!e.allDay&&e.start&&e.end).length} timed event(s)`);
+    addStat('Useful hours',reportFmtMinutes(usefulMinutes),`Excluded calendars: ${excludedEvents.length} event(s)`,usefulMinutes?'report-good':'');
     addStat('Tasks due',due.length,`${created.length} task(s) created`);
     addStat('Tasks completed',completed.length,`${rate}% of due tasks`);
     addStat('On time',onTime.length,`${late.length} late completion(s)`,late.length?'report-warn':'report-good');
@@ -5082,24 +5110,42 @@ const AppReports={
 
     const rows=days.map(day=>{
       const ev=events.filter(e=>e.date===day), td=due.filter(t=>t.due===day), dn=completed.filter(t=>t.completedAt===day), nd=notDone.filter(t=>t.notDoneAt===day);
-      return {day,events:ev.length,eventMinutes:ev.reduce((a,e)=>a+reportMinutes(e),0),due:td.length,done:dn.length,notDone:nd.length,open:td.filter(t=>!t.done&&!t.notDone).length}
+      const ue=ev.filter(e=>!reportCalendarExcluded(reportCalendarName(e)));
+      const xe=ev.filter(e=>reportCalendarExcluded(reportCalendarName(e)));
+      return {day,events:ev.length,eventMinutes:ev.reduce((a,e)=>a+reportMinutes(e),0),usefulMinutes:ue.reduce((a,e)=>a+reportMinutes(e),0),excludedMinutes:xe.reduce((a,e)=>a+reportMinutes(e),0),due:td.length,done:dn.length,notDone:nd.length,open:td.filter(t=>!t.done&&!t.notDone).length}
     });
     const section=h('div',{class:'report-section'});section.append(h('h3',{text:st.mode==='day'?'Day summary':st.mode==='week'?'Daily breakdown':'Daily breakdown'}));
     const card=h('div',{class:'report-card'});
     const table=h('table',{class:'report-table'});
-    table.innerHTML='<thead><tr><th>Date</th><th>Events</th><th>Time</th><th>Due</th><th>Done</th><th>Not done</th><th>Open</th></tr></thead>';
+    table.innerHTML='<thead><tr><th>Date</th><th>Events</th><th>Total time</th><th>Useful time</th><th>Excluded</th><th>Due</th><th>Done</th><th>Not done</th><th>Open</th></tr></thead>';
     const tb=h('tbody');
     const showRows=rows.filter(r=>st.mode==='day'||r.events||r.due||r.done||r.notDone);
     if(!showRows.length){card.append(h('div',{class:'report-empty',text:'No Calendar or Task activity in this range.'}))}
-    else{showRows.forEach(r=>{const tr=h('tr');tr.innerHTML=`<td>${esc(st.mode==='day'?'Selected day':reportLabelDay(r.day))}</td><td>${r.events}</td><td>${reportFmtMinutes(r.eventMinutes)}</td><td>${r.due}</td><td class="${r.done?'report-good':''}">${r.done}</td><td class="${r.notDone?'report-bad':''}">${r.notDone}</td><td class="${r.open?'report-warn':''}">${r.open}</td>`;tb.append(tr)});table.append(tb);card.append(table)}
+    else{showRows.forEach(r=>{const tr=h('tr');tr.innerHTML=`<td>${esc(st.mode==='day'?'Selected day':reportLabelDay(r.day))}</td><td>${r.events}</td><td>${reportFmtMinutes(r.eventMinutes)}</td><td class="report-good">${reportFmtMinutes(r.usefulMinutes)}</td><td>${reportFmtMinutes(r.excludedMinutes)}</td><td>${r.due}</td><td class="${r.done?'report-good':''}">${r.done}</td><td class="${r.notDone?'report-bad':''}">${r.notDone}</td><td class="${r.open?'report-warn':''}">${r.open}</td>`;tb.append(tr)});table.append(tb);card.append(table)}
     section.append(card);body.append(section);
 
     const two=h('div',{class:'report-two report-section'});
-    const calCard=h('div',{class:'report-card'});calCard.append(h('h3',{text:'Calendar load'}));
-    const evBars=h('div',{class:'report-bars'}), maxEv=Math.max(1,...rows.map(r=>r.events));
-    rows.filter(r=>st.mode==='day'||r.events).forEach(r=>{const row=h('div',{class:'report-bar-row'});row.append(h('div',{class:'report-bar-label',text:st.mode==='day'?'Selected day':reportLabelDay(r.day)}),h('div',{class:'report-bar-track'},h('div',{class:'report-bar-fill',style:{width:(r.events/maxEv*100)+'%'}})),h('div',{class:'mono',text:String(r.events)}));evBars.append(row)});
-    if(!evBars.children.length)evBars.append(h('div',{class:'report-muted',text:'No calendar events.'}));calCard.append(evBars);
-    const allDay=events.filter(e=>e.allDay).length;calCard.append(h('div',{class:'report-legend'},h('span',{text:`${allDay} all-day`}),h('span',{text:`${events.length-allDay} timed/other`}),h('span',{text:`${reportFmtMinutes(eventMinutes)} scheduled`})));two.append(calCard);
+    const calCard=h('div',{class:'report-card'});calCard.append(h('h3',{text:'Useful time by day'}));
+    const usefulBars=h('div',{class:'report-bars'}), maxUseful=Math.max(1,...rows.map(r=>r.usefulMinutes));
+    rows.filter(r=>st.mode==='day'||r.usefulMinutes||r.excludedMinutes).forEach(r=>{const row=h('div',{class:'report-bar-row'});row.append(h('div',{class:'report-bar-label',text:st.mode==='day'?'Selected day':reportLabelDay(r.day)}),h('div',{class:'report-bar-track'},h('div',{class:'report-bar-fill',style:{width:(r.usefulMinutes/maxUseful*100)+'%',background:'linear-gradient(90deg,var(--good),var(--s3))'}})),h('div',{class:'mono',text:reportFmtMinutes(r.usefulMinutes)}));usefulBars.append(row)});
+    if(!usefulBars.children.length)usefulBars.append(h('div',{class:'report-muted',text:'No useful calendar time in this range.'}));calCard.append(usefulBars);
+    const allDay=events.filter(e=>e.allDay).length;
+    calCard.append(h('div',{class:'report-legend'},
+      h('span',{class:'report-good',text:`Useful: ${reportFmtMinutes(usefulMinutes)}`}),
+      h('span',{class:'report-warn',text:`Excluded: ${reportFmtMinutes(excludedMinutes)}`}),
+      h('span',{text:`All-day events: ${allDay}`}),
+      h('span',{text:'Excluded: hobbys · break · failure · mandatory'})
+    ));
+    const calNames=[...new Set(events.map(reportCalendarName))];
+    const calTable=h('table',{class:'report-table',style:{marginTop:'10px'}});
+    calTable.innerHTML='<thead><tr><th>Calendar</th><th>Events</th><th>Hours</th><th>Useful?</th></tr></thead>';
+    const calTb=h('tbody');
+    calNames.sort((a,b)=>a.localeCompare(b)).forEach(name=>{
+      const es=events.filter(e=>reportCalendarName(e)===name), mins=es.reduce((a,e)=>a+reportMinutes(e),0), excluded=reportCalendarExcluded(name);
+      const tr=h('tr');tr.innerHTML=`<td>${esc(name)}</td><td>${es.length}</td><td>${reportFmtMinutes(mins)}</td><td class="${excluded?'report-warn':'report-good'}">${excluded?'Excluded':'Useful'}</td>`;calTb.append(tr);
+    });
+    if(calNames.length){calTable.append(calTb);calCard.append(calTable)}
+    two.append(calCard);
 
     const taskCard=h('div',{class:'report-card'});taskCard.append(h('h3',{text:'Task outcomes'}));
     const outcome=[['Completed',completed.length,'var(--good)'],['Open',openDue.length,'var(--warn)'],['Not done',notDone.length,'var(--crit)'],['Due',due.length,'var(--accent)']],maxO=Math.max(1,...outcome.map(x=>x[1])),ob=h('div',{class:'report-bars'});
@@ -5110,6 +5156,30 @@ const AppReports={
     meta.append(h('div',{class:'report-kpi-line'},h('span',{text:'Overdue at period end'}),h('strong',{class:openDue.some(t=>t.due<range.end)?'report-warn':'',text:String(openDue.filter(t=>t.due&&t.due<range.end).length)})));
     meta.append(h('div',{class:'report-kpi-line'},h('span',{text:'Done without completion date'}),h('strong',{class:unknownCompletion.length?'report-warn':'',text:String(unknownCompletion.length)})));
     taskCard.append(meta);two.append(taskCard);body.append(two);
+
+    const breakdownSection=h('div',{class:'report-section'});
+    breakdownSection.append(h('h3',{text:'Task analysis by category and priority'}));
+    const breakdownGrid=h('div',{class:'report-two'});
+
+    function buildBreakdown(title, items, keyFn){
+      const card=h('div',{class:'report-card'});card.append(h('h3',{text:title}));
+      const names=[...new Set(items.map(keyFn))].sort((a,b)=>a.localeCompare(b));
+      if(!names.length){card.append(h('div',{class:'report-empty',text:`No ${title.toLowerCase()} data.`}));return card}
+      const table=h('table',{class:'report-table'});
+      table.innerHTML='<thead><tr><th>Name</th><th>Due</th><th>Done</th><th>Open</th><th>Not done</th><th>Rate</th></tr></thead>';
+      const tb=h('tbody');
+      names.forEach(name=>{
+        const ds=due.filter(t=>keyFn(t)===name), co=completed.filter(t=>keyFn(t)===name), no=notDone.filter(t=>keyFn(t)===name), op=ds.filter(t=>!t.done&&!t.notDone);
+        const pct=ds.length?Math.round(co.length/ds.length*100):0;
+        const tr=h('tr');
+        tr.innerHTML=`<td>${esc(name)}</td><td>${ds.length}</td><td class="report-good">${co.length}</td><td class="${op.length?'report-warn':''}">${op.length}</td><td class="${no.length?'report-bad':''}">${no.length}</td><td>${ds.length?pct+'%':'—'}</td>`;
+        tb.append(tr);
+      });
+      table.append(tb);card.append(table);return card;
+    }
+    breakdownGrid.append(buildBreakdown('Categories',due,reportTaskCategoryName));
+    breakdownGrid.append(buildBreakdown('Priorities',due,reportPriorityName));
+    breakdownSection.append(breakdownGrid);body.append(breakdownSection);
 
     const detail=h('div',{class:'report-section'});detail.append(h('h3',{text:'Task details'}));
     const dc=h('div',{class:'report-card'});
@@ -5127,9 +5197,14 @@ const AppReports={
 };
 
 function exportReportCSV(range){
-  const rows=[['Type','Date','Title','Due','Completed','Status','Minutes']];
-  (DB.events||[]).filter(e=>!calHidden(e)&&reportInRange(e.date,range.start,range.end)).forEach(e=>rows.push(['Calendar',e.date,e.title||'','','','',reportMinutes(e)]));
-  (DB.tasks||[]).filter(t=>reportInRange(t.due,range.start,range.end)||reportInRange(t.completedAt,range.start,range.end)||reportInRange(t.notDoneAt,range.start,range.end)).forEach(t=>rows.push(['Task',t.due||t.completedAt||t.notDoneAt||'',t.title||'',t.due||'',t.completedAt||'',reportTaskStatus(t),'']));
+  const rows=[['Type','Date','Title','Due','Completed','Status','Minutes','Calendar','Useful time?','Category','Priority']];
+  (DB.events||[]).filter(e=>!calHidden(e)&&reportInRange(e.date,range.start,range.end)).forEach(e=>{
+    const name=reportCalendarName(e), excluded=reportCalendarExcluded(name);
+    rows.push(['Calendar',e.date,e.title||'','','','',reportMinutes(e),name,!excluded?'Yes':'No','','']);
+  });
+  (DB.tasks||[]).filter(t=>reportInRange(t.due,range.start,range.end)||reportInRange(t.completedAt,range.start,range.end)||reportInRange(t.notDoneAt,range.start,range.end)).forEach(t=>{
+    rows.push(['Task',t.due||t.completedAt||t.notDoneAt||'',t.title||'',t.due||'',t.completedAt||'',reportTaskStatus(t),'','', '',reportTaskCategoryName(t),reportPriorityName(t)]);
+  });
   const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download=`orbit-report-${range.start}-to-${range.end}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
