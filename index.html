@@ -979,6 +979,29 @@ input.persian-text,
 .spot-item .s{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 
+
+<style id="orbit-session-orbs-v6">
+.course-session-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px}
+.course-session{border:0!important;background:transparent!important;overflow:visible!important;min-width:0}
+.course-session-head{display:flex;flex-direction:column;align-items:center;gap:7px;padding:0!important;border:0!important}
+.session-orb{
+  width:112px;height:112px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:16px;box-sizing:border-box;cursor:pointer;position:relative;
+  border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));
+  background:radial-gradient(circle at 30% 22%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 48%),var(--surface-2);
+  box-shadow:0 10px 26px rgba(35,20,35,.08), inset 0 1px 0 rgba(255,255,255,.55);
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.session-orb:hover{transform:translateY(-3px) scale(1.02);border-color:var(--accent);box-shadow:0 14px 32px rgba(35,20,35,.14)}
+.session-orb .orb-title{font-size:12px;line-height:1.35;font-weight:800;max-width:82px;max-height:62px;overflow:hidden}
+.session-orb .orb-dot{position:absolute;right:9px;top:9px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 13%,transparent)}
+.session-orb-date{font-size:10px;color:var(--muted);text-align:center}
+.session-orb-actions{display:flex;gap:5px;justify-content:center}
+.session-orb-actions .btn{font-size:10px;padding:5px 7px}
+.session-note-body{display:none!important}
+@media(max-width:620px){.course-session-list{grid-template-columns:repeat(2,minmax(120px,1fr))}.session-orb{width:96px;height:96px}}
+</style>
+
 </head>
 <body data-wall="aurora">
 <style>
@@ -4412,8 +4435,38 @@ function makeNoteToolbar(editable){
   );
   return bar;
 }
-function createRichNoteEditor(initial,onChange){const wrap=h('div',{class:'rich-note-editor'});const editable=h('div',{class:'rich-note-editable',contenteditable:'true',spellcheck:'true'});editable.innerHTML=sanitizeNoteHTML(initial||''); editable.style.fontFamily='Vazirmatn, Estedad, "Noto Naskh Arabic", Shabnam, Tahoma, sans-serif';editable.dir=richDir(initial||'');editable.classList.toggle('persian-text',editable.dir==='rtl');const emit=()=>{editable.dir=richDir(editable.innerHTML);editable.classList.toggle('persian-text',editable.dir==='rtl');onChange(sanitizeNoteHTML(editable.innerHTML))};editable.addEventListener('input',emit);editable.addEventListener('blur',emit);wrap.append(makeNoteToolbar(editable),editable);return wrap}
-async function richNoteModal(title,initial){return new Promise(resolve=>{const wrap=h('div',{class:'rich-note-modal'});let value=sanitizeNoteHTML(initial||'');const editor=createRichNoteEditor(value,v=>{value=v});wrap.append(editor);const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null)}}),h('button',{class:'btn primary',text:'Save note',onclick:()=>{closeModal();resolve(value)}}));modal({title,bodyNode:wrap,footNode:foot,wide:true})})}
+function createRichNoteEditor(initial,onChange){
+  const wrap=h('div',{class:'rich-note-editor'});
+  const editable=h('div',{class:'rich-note-editable',contenteditable:'true',spellcheck:'true'});
+  editable.innerHTML=sanitizeNoteHTML(initial||'');
+  editable.style.fontFamily='Vazirmatn, Estedad, "Noto Naskh Arabic", Shabnam, Tahoma, sans-serif';
+  editable.dir=richDir(initial||'');
+  editable.classList.toggle('persian-text',editable.dir==='rtl');
+  let lastDirection=editable.dir;
+  const emit=()=>{
+    const html=editable.innerHTML;
+    const dir=richDir(html);
+    if(dir!==lastDirection){editable.dir=dir;editable.classList.toggle('persian-text',dir==='rtl');lastDirection=dir;}
+    onChange(html);
+  };
+  editable.addEventListener('input',emit);
+  editable.addEventListener('blur',()=>onChange(sanitizeNoteHTML(editable.innerHTML)));
+  wrap.append(makeNoteToolbar(editable),editable);
+  return wrap;
+}
+async function richNoteModal(title,initial){
+  return new Promise(resolve=>{
+    const wrap=h('div',{class:'rich-note-modal'});
+    let value=sanitizeNoteHTML(initial||'');
+    const editor=createRichNoteEditor(value,v=>{value=v});
+    wrap.append(editor);
+    const foot=h('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+      h('button',{class:'btn',text:'Cancel',onclick:()=>{closeModal();resolve(null)}}),
+      h('button',{class:'btn primary',text:'Save note',onclick:()=>{closeModal();resolve(sanitizeNoteHTML(value))}})
+    );
+    modal({title,bodyNode:wrap,footNode:foot,wide:true});
+  })
+}
 
 /* ============================================================
    COURSES — what you signed up for, why, and what it cost
@@ -4657,7 +4710,12 @@ function courseDetail(body, c, re, st) {
     h('span',{class:'tiny',text:'Free-form notes'})
   );
   general.append(generalHead);
-  const generalEditor = createRichNoteEditor(c.notes || '', v => { c.notes = v; save(); });
+  let generalSaveTimer=null;
+  const generalEditor = createRichNoteEditor(c.notes || '', v => {
+    c.notes = v;
+    clearTimeout(generalSaveTimer);
+    generalSaveTimer=setTimeout(()=>{ c.notes=sanitizeNoteHTML(c.notes||''); save(); },700);
+  });
   general.append(generalEditor);
   body.append(general);
 
@@ -4695,42 +4753,40 @@ function courseDetail(body, c, re, st) {
     orderedSessions.forEach((ss,i)=>{
       const row=h('div',{class:'course-session'});
       const head=h('div',{class:'course-session-head'});
-      head.append(
-        h('div',{},
-          h('div',{class:'course-session-title',text:ss.title||`Session ${i+1}`}),
-          h('div',{class:'tiny',text:ss.date?fmtDate(ss.date,{month:'short',day:'numeric',year:'numeric'}):`Session ${i+1}`})
-        ),
-        h('div',{class:'spacer'}),
-        h('button',{class:'btn ghost sm',text:'Edit session',onclick:async()=>{
-          const o=await formModal('Edit session',[
-            {k:'title',label:'Session title',required:true},
-            {k:'date',label:'Date',type:'date'}
-          ],{title:ss.title||`Session ${i+1}`,date:ss.date||today()},{
-            onDelete:async()=>{
-              if(await confirmModal('Delete session?',`"${ss.title||`Session ${i+1}`}" will be removed.`)){
-                c.sessions=c.sessions.filter(x=>x.id!==ss.id); commit();
-              }
-            }
-          });
-          if(o){
-            Object.assign(ss,{title:o.title,date:o.date||''});
-            commit();
-          }
-        }}),
-        h('button',{class:'btn primary sm',html:`${icon('edit',13)} Edit notes`,onclick:async()=>{
-          const body = await richNoteModal(`Session ${i+1} — Rich Notes`, ss.body||'');
-          if(body !== null){
-            ss.body = body;
-            commit();
-          }
-        }})
+      const title=ss.title||`Session ${i+1}`;
+      const initials=title.trim().slice(0,2).toUpperCase();
+      const orb=h('div',{class:'session-orb',title:'Open and edit notes',onclick:async()=>{
+        const body=await richNoteModal(`${title} — Rich Notes`,ss.body||'');
+        if(body!==null){ss.body=body;commit();}
+      }});
+      orb.append(
+        h('span',{class:'orb-dot'}),
+        h('span',{class:'orb-title',text:initials.length<3?title:initials})
       );
-      const text=h('div',{class:'session-note-body'});
-      text.innerHTML = ss.body ? sanitizeNoteHTML(ss.body) : 'No notes in this session yet.';
-      text.dir=richDir(ss.body||'');
-      if(text.dir==='rtl') text.classList.add('persian-text');
-      if(!ss.body) text.classList.add('is-empty');
-      row.append(head,text);
+      head.append(
+        orb,
+        h('div',{class:'session-orb-date',text:ss.date?fmtDate(ss.date,{month:'short',day:'numeric',year:'numeric'}):`Session ${i+1}`}),
+        h('div',{class:'session-orb-actions'},
+          h('button',{class:'btn ghost sm',text:'Edit session',onclick:async()=>{
+            const o=await formModal('Edit session',[
+              {k:'title',label:'Session title',required:true},
+              {k:'date',label:'Date',type:'date'}
+            ],{title:ss.title||`Session ${i+1}`,date:ss.date||today()},{
+              onDelete:async()=>{
+                if(await confirmModal('Delete session?',`"${ss.title||`Session ${i+1}`}" will be removed.`)){
+                  c.sessions=c.sessions.filter(x=>x.id!==ss.id); commit();
+                }
+              }
+            });
+            if(o){Object.assign(ss,{title:o.title,date:o.date||''});commit();}
+          }}),
+          h('button',{class:'btn primary sm',html:`${icon('edit',13)} Notes`,onclick:async()=>{
+            const body=await richNoteModal(`${title} — Rich Notes`,ss.body||'');
+            if(body!==null){ss.body=body;commit();}
+          }})
+        )
+      );
+      row.append(head);
       list.append(row);
     });
     sessionsCard.append(list);
@@ -6148,12 +6204,18 @@ $('#spot-input').addEventListener('keydown', e => {
 /* ---------- global keys ---------- */
 document.addEventListener('keydown', e => {
   const mod = e.metaKey || e.ctrlKey;
-  if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#spot').classList.contains('open') ? closeSpot() : openSpot(); return; }
+  if (mod && e.key.toLowerCase() === 'k') {
+    if (e.target?.isContentEditable || e.target?.closest?.('[contenteditable="true"]')) return;
+    e.preventDefault(); $('#spot').classList.contains('open') ? closeSpot() : openSpot(); return;
+  }
   if (e.key === 'Escape') {
     if ($('#spot').classList.contains('open')) return closeSpot();
     if ($('#modal-root').classList.contains('open')) return closeModal();
   }
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  const activeEl=document.activeElement;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(activeEl?.tagName || '') ||
+    !!activeEl?.isContentEditable ||
+    !!activeEl?.closest?.('[contenteditable="true"]');
   if (mod && e.key.toLowerCase() === 'w') { const t = topWin(); if (t) { e.preventDefault(); closeApp(t); } return; }
   if (!typing && !mod && e.key >= '1' && e.key <= '9') { const a = APPS[+e.key - 1]; if (a) openApp(a.id); }
 });
