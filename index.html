@@ -1250,6 +1250,10 @@ input.persian-text,
   .reading-color-popover{grid-template-columns:repeat(7,18px);width:184px}
 }
 </style>
+
+<style id="orbit-goal-v16-monthly">
+.goal-monthly-note{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));background:var(--accent-soft);font-size:10.5px;color:var(--text-2)}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -7188,19 +7192,26 @@ AppGoals.render=function(root,re,st){
         ['#3f1d1d','Deep cocoa'],['#1f2937','Deep graphite'],['#334155','Deep slate'],['#4c1d95','Deep purple-blue']
       ]},
       {k:'scope',label:'Horizon',type:'select',options:GOAL_SCOPES},
-      {k:'quarterMonth',label:'Quarter month',type:'select',options:QUARTER_MONTHS.map(m=>[String(m.n),m.name])},
+      {k:'quarterMonth',label:'Persian month',type:'select',options:QUARTER_MONTHS.map(m=>[String(m.n),m.name]),hint:'For Monthly goals: choose the Solar Hijri month. The goal will also appear inside that month in Quarter.'},
+      {k:'quarterInQuarter',label:'Show this Monthly goal in Quarter',type:'select',options:[['yes','Yes — include it in Quarter'],['no','No — keep it only in Monthly']]},
       {type:'row',fields:[{k:'startDate',label:'Start date',type:'date',required:true},{k:'endDate',label:'Deadline',type:'date'}]},
       {k:'measurement',label:'Measurement',type:'select',options:[['milestone','Checklist / milestones'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['output','Output / Deliverables'],['hours','Time / Hours']]},
       {type:'row',fields:[{k:'current',label:'Current value',type:'number',step:'any'},{k:'target',label:'Target value',type:'number',step:'any'}]},
       {k:'milestoneText',label:'Checklist / milestones',type:'textarea',rows:7,placeholder:'One item per line'},
       {k:'reviewText',label:'Review dates',type:'textarea',rows:2,placeholder:'Select dates later in Review section'},
       {k:'why',label:'Why this matters',type:'textarea',rows:2}
-    ],{title:g.title||'',sticker:g.sticker||'🎯',category:g.category||cats()[0],priority:g.priority||'Medium',titleHighlight:g.titleHighlight||'',scope:g.scope||'week',quarterMonth:String(g.quarterMonth||1),startDate:g.startDate||ORBIT_DEFAULT_DATE,endDate:g.endDate||'',measurement:g.measurement||'milestone',current:g.current||0,target:g.target||'',milestoneText:old.map(m=>m.title).join('\n'),reviewText:(g.reviewDates||[]).join(', '),why:g.why||''});
+    ],{title:g.title||'',sticker:g.sticker||'🎯',category:g.category||cats()[0],priority:g.priority||'Medium',titleHighlight:g.titleHighlight||'',scope:g.scope||'week',quarterMonth:String(g.quarterMonth||1),quarterInQuarter:(g.scope==='month' ? (g.quarterInQuarter===false?'no':'yes') : 'no'),startDate:g.startDate||ORBIT_DEFAULT_DATE,endDate:g.endDate||'',measurement:g.measurement||'milestone',current:g.current||0,target:g.target||'',milestoneText:old.map(m=>m.title).join('\n'),reviewText:(g.reviewDates||[]).join(', '),why:g.why||''});
     if(!out)return;
     const titles=String(out.milestoneText||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     out.milestones=titles.map((title,i)=>{const existing=old.find(m=>m.title===title)||old[i]||{};return{id:existing.id||uid(),title,done:!!existing.done,completedAt:existing.completedAt||''};});
     out.reviewDates=String(out.reviewText||'').split(',').map(x=>x.trim()).filter(Boolean);delete out.milestoneText;delete out.reviewText;
     if(out.scope==='day')out.scope='week';
+    if(out.scope==='month'){
+      out.quarterMonth=Number(out.quarterMonth)||1;
+      out.quarterInQuarter=String(out.quarterInQuarter||'yes')!=='no';
+    }else{
+      out.quarterInQuarter=false;
+    }
     if(isNew)DB.goals.push({id:uid(),createdAt:today(),done:false,...out});else Object.assign(DB.goals.find(x=>x.id===g.id),out);
     commit(); re();
   }
@@ -7262,9 +7273,42 @@ AppGoals.render=function(root,re,st){
           mh.append(h('strong',{text:m.name}));
           mh.append(h('button',{class:'btn primary sm quarter-add',text:'+ Goal',onclick:()=>openEditor({scope:'quarter',quarterMonth:String(mnum),startDate:ORBIT_DEFAULT_DATE,endDate:ORBIT_DEFAULT_DATE},re)}));
           monthWrap.append(mh);
-          const gs=list.filter(g=>g.scope==='quarter'&&quarterMonthForGoal(g)===mnum).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||(a.category||'General').localeCompare(b.category||'General')||String(a.endDate||a.deadline||a.startDate||ORBIT_DEFAULT_DATE).localeCompare(String(b.endDate||b.deadline||b.startDate||ORBIT_DEFAULT_DATE)));
-          if(!gs.length){monthWrap.append(h('div',{class:'quarter-month-empty',text:'No goals yet.'}));}
-          else{let currentCat='';let grid=null;gs.forEach(g=>{const cat=g.category||'General';if(cat!==currentCat){currentCat=cat;monthWrap.append(h('div',{class:'goal-section-head'},h('h3',{text:cat})));grid=h('div',{class:'goal-grid'});monthWrap.append(grid);}grid.append(card(g,re));});}
+          const gs=list.filter(g=>(
+            g.scope==='quarter' || (g.scope==='month' && g.quarterInQuarter!==false)
+          )&&quarterMonthForGoal(g)===mnum)
+            .sort((a,b)=>
+              (b.pinned?1:0)-(a.pinned?1:0) ||
+              (a.scope==='month'?0:1)-(b.scope==='month'?0:1) ||
+              (a.category||'General').localeCompare(b.category||'General') ||
+              String(a.endDate||a.deadline||a.startDate||ORBIT_DEFAULT_DATE).localeCompare(String(b.endDate||b.deadline||b.startDate||ORBIT_DEFAULT_DATE))
+            );
+          if(!gs.length){
+            monthWrap.append(h('div',{class:'quarter-month-empty',text:'No goals yet.'}));
+          }else{
+            const monthlyGs=gs.filter(g=>g.scope==='month');
+            const quarterGs=gs.filter(g=>g.scope==='quarter');
+
+            function appendGoalGroup(title, items){
+              if(!items.length)return;
+              monthWrap.append(
+                h('div',{class:'goal-section-head'},
+                  h('h3',{text:title}),
+                  h('span',{class:'tiny',text:`${items.length}`})
+                )
+              );
+              const byCat={};
+              items.forEach(g=>(byCat[g.category||'General']||=[]).push(g));
+              Object.entries(byCat).forEach(([catName,cgs])=>{
+                monthWrap.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));
+                const grid=h('div',{class:'goal-grid'});
+                cgs.forEach(g=>grid.append(card(g,re)));
+                monthWrap.append(grid);
+              });
+            }
+
+            appendGoalGroup('Monthly goals',monthlyGs);
+            appendGoalGroup('Quarterly goals',quarterGs);
+          }
           sec.append(monthWrap);
         });
         body.append(sec);
@@ -8039,7 +8083,7 @@ if(typeof buildDock==='function')buildDock();
 if(typeof buildDesktopIcons==='function')buildDesktopIcons();
 if(typeof syncDock==='function')syncDock();
 
-console.log('%cOrbit v15','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
+console.log('%cOrbit v16','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
 })();
 </script>
 
