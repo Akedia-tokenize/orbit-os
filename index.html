@@ -1254,7 +1254,28 @@ input.persian-text,
 <style id="orbit-goal-v16-monthly">
 .goal-monthly-note{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));background:var(--accent-soft);font-size:10.5px;color:var(--text-2)}
 </style>
-</head>
+
+<style id="orbit-quarter-v19">
+.quarter-month{
+  margin:10px 0 14px!important;
+  padding:12px!important;
+  border-radius:14px!important;
+  min-height:78px;
+}
+.quarter-month-head{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  margin-bottom:8px!important;
+}
+.quarter-month-head strong{font-size:13px!important}
+.quarter-month-head .quarter-add{margin-left:auto!important;flex:0 0 auto}
+.quarter-month-empty{padding:4px 0!important}
+</style>
+<style id="orbit-quarter-monthly-badge">
+.quarter-origin-badge{display:inline-flex;align-items:center;gap:5px;margin:0 0 6px 0;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.04em;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);color:#fbbf24}
+</style></head>
 <body data-wall="aurora">
 <style>
 #dicons{z-index:10}
@@ -7245,22 +7266,77 @@ AppGoals.render=function(root,re,st){
   
 async function openQuarterGoalEditor(monthNum,re){
   const mnum=Number(monthNum)||1;
-  const seed={
+  const monthName=(QUARTER_MONTHS.find(x=>x.n===mnum)||{}).name||'';
+  const out=await formModal(
+    `New Quarterly Goal · ${monthName}`,
+    [
+      {k:'title',label:'Goal',required:true,placeholder:'What must become true this quarter?'},
+      {k:'category',label:'Category',type:'select',options:cats().map(x=>[x,x])},
+      {k:'priority',label:'Importance',type:'select',options:[['Critical','Critical'],['High','High'],['Medium','Medium'],['Low','Low'],['one','The One Thing']]},
+      {k:'sticker',label:'Sticker',type:'select',options:[
+        ['🎯','🎯'],['💪','💪'],['📚','📚'],['🚀','🚀'],['💰','💰'],['❤️','❤️'],
+        ['🏃','🏃'],['🧠','🧠'],['🎨','🎨'],['🌱','🌱'],['✨','✨'],['🤝','🤝'],
+        ['🏆','🏆'],['🔥','🔥'],['💡','💡'],['✈️','✈️'],['🏠','🏠'],['🎵','🎵']
+      ]},
+      {k:'startDate',label:'Start date',type:'date',required:true},
+      {k:'endDate',label:'Deadline',type:'date'},
+      {k:'measurement',label:'Measurement',type:'select',options:[
+        ['milestone','Checklist / milestones'],['numeric','Numeric result'],['kpi','KPI / Percentage'],['output','Output / Deliverables'],['hours','Time / Hours']
+      ]},
+      {type:'row',fields:[
+        {k:'current',label:'Current value',type:'number',step:'any'},
+        {k:'target',label:'Target value',type:'number',step:'any'}
+      ]},
+      {k:'milestoneText',label:'Checklist / milestones',type:'textarea',rows:6,placeholder:'One milestone per line'},
+      {k:'why',label:'Why this matters',type:'textarea',rows:2},
+      {k:'reviewText',label:'Review dates',type:'textarea',rows:2,placeholder:'Optional'}
+    ],
+    {
+      category:cats()[0]||'General',
+      priority:'Medium',
+      sticker:'🎯',
+      startDate:ORBIT_DEFAULT_DATE,
+      endDate:ORBIT_DEFAULT_DATE,
+      measurement:'milestone',
+      current:0,
+      target:'',
+      milestoneText:'',
+      why:'',
+      reviewText:''
+    }
+  );
+  if(!out)return;
+
+  const titles=String(out.milestoneText||'')
+    .split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+
+  const goal={
+    id:uid(),
+    createdAt:today(),
+    done:false,
+    title:String(out.title||'').trim(),
+    category:out.category||'General',
+    priority:out.priority||'Medium',
+    sticker:out.sticker||'🎯',
     scope:'quarter',
-    quarterMonth:String(mnum),
+    quarterMonth:mnum,
     quarterInQuarter:true,
-    startDate:ORBIT_DEFAULT_DATE,
-    endDate:ORBIT_DEFAULT_DATE,
-    category:cats()[0]||'General',
-    priority:'Medium',
-    measurement:'milestone',
-    current:0,
-    target:'',
-    milestoneText:'',
-    reviewText:'',
-    why:''
+    startDate:out.startDate||ORBIT_DEFAULT_DATE,
+    endDate:out.endDate||'',
+    measurement:out.measurement||'milestone',
+    current:Number(out.current)||0,
+    target:out.target===''?'':Number(out.target),
+    milestones:titles.map(title=>({id:uid(),title,done:false,completedAt:''})),
+    reviewDates:String(out.reviewText||'').split(',').map(x=>x.trim()).filter(Boolean),
+    why:String(out.why||''),
+    pinned:false,
+    checklistOpen:false
   };
-  await openEditor(seed,re);
+
+  DB.goals.push(goal);
+  commit();
+  if(typeof toast==='function')toast(`Added to Quarter · ${monthName}`,'check');
+  if(typeof re==='function')re();
 }
 
 function render(root,re,st){
@@ -7305,7 +7381,16 @@ function render(root,re,st){
     scopeSeg.append(h('button',{class:st.scope==='all'?'on':'',text:'All',onclick:()=>{st.scope='all';re();}})); controls.append(scopeSeg); body.append(controls);
     const catSelect=h('select',{class:'inp goal-filter'});catSelect.append(h('option',{value:'all',text:'All categories'}));cats().forEach(x=>catSelect.append(h('option',{value:x,text:x})));catSelect.value=st.cat||'all';catSelect.onchange=()=>{st.cat=catSelect.value;re();};controls.append(catSelect); controls.append(h('button',{class:'btn sm '+(st.pinnedOnly?'primary':'ghost'),text:`📌 Pinned${DB.goals.filter(g=>g.pinned).length?` (${DB.goals.filter(g=>g.pinned).length})`:''}`,onclick:()=>{st.pinnedOnly=!st.pinnedOnly;re();}}));
     let list=DB.goals.filter(g=>g.scope!=='day');
-    if(st.pinnedOnly) list=list.filter(g=>g.pinned); if(st.scope!=='all') list=list.filter(g=>g.scope===st.scope); if(st.cat&&st.cat!=='all')list=list.filter(g=>(g.category||'General')===st.cat); list.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+    if(st.pinnedOnly) list=list.filter(g=>g.pinned);
+    if(st.scope==='quarter'){
+      // Quarter shows native Quarterly goals plus Monthly goals explicitly
+      // marked to appear in Quarter.
+      list=list.filter(g=>g.scope==='quarter'||(g.scope==='month'&&g.quarterInQuarter!==false));
+    }else if(st.scope!=='all'){
+      list=list.filter(g=>g.scope===st.scope);
+    }
+    if(st.cat&&st.cat!=='all')list=list.filter(g=>(g.category||'General')===st.cat);
+    list.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
     if(st.scope==='quarter'){
       const seasonMap=[
         {key:'spring',name:'Spring',months:[1,2,3],label:'Farvardin → Khordad',icon:'🌱',color:'#4ade80'},
@@ -7349,7 +7434,16 @@ function render(root,re,st){
               Object.entries(byCat).forEach(([catName,cgs])=>{
                 monthWrap.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));
                 const grid=h('div',{class:'goal-grid'});
-                cgs.forEach(g=>grid.append(card(g,re)));
+                cgs.forEach(g=>{
+                  const node=card(g,re);
+                  if(g.scope==='month'){
+                    const wrap=h('div',{style:{position:'relative'}});
+                    wrap.append(h('div',{class:'quarter-origin-badge',text:'MONTHLY GOAL · ALSO IN QUARTER'}));
+                    wrap.append(node); grid.append(wrap);
+                  }else{
+                    grid.append(node);
+                  }
+                });
                 monthWrap.append(grid);
               });
             }
@@ -8131,7 +8225,7 @@ if(typeof buildDock==='function')buildDock();
 if(typeof buildDesktopIcons==='function')buildDesktopIcons();
 if(typeof syncDock==='function')syncDock();
 
-console.log('%cOrbit v18','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
+console.log('%cOrbit v20','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
 })();
 </script>
 
