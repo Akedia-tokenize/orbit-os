@@ -1152,6 +1152,35 @@ input.persian-text,
 .report-stat .value.report-warn{color:var(--warn)}
 .report-stat .value.report-bad{color:var(--crit)}
 </style>
+
+<style id="orbit-reading-v14">
+.reading-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin:12px 0 8px}
+.reading-summary-card{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.reading-summary-card .k{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:800}
+.reading-summary-card strong{display:block;font-size:20px;margin-top:4px}
+.reading-v13-card{position:relative;cursor:pointer;overflow:hidden}
+.reading-v13-card:hover{transform:translateY(-2px)}
+.reading-mini-stats{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 7px}
+.reading-mini-stats span{font-size:10.5px;color:var(--text-2);padding:3px 6px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border)}
+.reading-progress{height:10px!important;margin-top:7px!important;background:var(--surface-3)!important}
+.reading-progress i{background:linear-gradient(90deg,var(--bar-color),color-mix(in srgb,var(--bar-color) 45%,white))!important}
+.reading-progress-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.reading-progress-row strong{font-size:12px}.reading-progress-row span{font-size:10.5px;color:var(--muted);text-align:right}
+.reading-goal-line{display:flex;justify-content:space-between;gap:8px;margin-top:7px;padding-top:7px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}
+.reading-goal-line strong{color:var(--text-2)}
+.reading-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:9px}
+.reading-v13-card .glow{background:radial-gradient(260px 90px at 100% 0%,color-mix(in srgb,var(--vc) 16%,transparent),transparent 70%)}
+.reading-color-label{font-size:10px;color:var(--muted);margin-top:9px;margin-bottom:4px}
+.reading-color-palette{display:flex;gap:4px;flex-wrap:wrap;padding:4px 0}
+.reading-color-swatch{width:16px;height:16px;border-radius:50%;border:1px solid rgba(255,255,255,.22);box-shadow:0 1px 3px rgba(0,0,0,.15);padding:0;transition:transform .12s,box-shadow .12s}
+.reading-color-swatch:hover{transform:scale(1.22);box-shadow:0 3px 8px rgba(0,0,0,.24)}
+.reading-color-swatch.selected{outline:2px solid var(--text);outline-offset:2px}
+@media(max-width:700px){
+  .reading-summary-grid{grid-template-columns:repeat(2,1fr)}
+  .reading-actions{justify-content:stretch}
+  .reading-actions .btn{flex:1}
+}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -1392,6 +1421,7 @@ function loadDB() {
 function migrate() {
   DB.goals ||= [];
   DB.bodyTracker ||= { proteinTarget: '', weightTarget: '', entries: [] };
+  try{ensureReading();}catch(e){}
   DB.bodyTracker.entries ||= [];
   DB.cats = (DB.cats || []).filter(c => c !== 'Investment');
   /* old "Investment" expenses become real investments on the Budgets tab */
@@ -7690,55 +7720,239 @@ const AppLanguage={ id:'language',name:'English',icon:'globe',color:'#8b5cf6',w:
 };
 
 /* ============================ READING & LEARNING ============================ */
-const READ_TYPE=[['Book','#fb7185'],['Article','#4cc9f0'],['Course','#fbbf24'],['Podcast','#8b5cf6'],['Paper','#22c55e']];
+const READ_TYPE=[
+  ['Book','#fb7185'],
+  ['Article','#4cc9f0'],
+  ['Course','#fbbf24'],
+  ['Podcast','#8b5cf6'],
+  ['Paper','#22c55e']
+];
 const READ_STATUS=[['reading','Reading'],['want','Want to'],['done','Finished']];
-function ensureReading(){ if(!Array.isArray(DB.reading))DB.reading=[]; return DB.reading; }
+const READ_COLORS=[
+  ['#ff5c8a','Rose'],['#ff7657','Coral'],['#ffc857','Golden'],['#f4e35e','Sun'],
+  ['#7ddf7d','Leaf'],['#36d399','Mint'],['#2dd4bf','Teal'],['#4cc9f0','Sky'],
+  ['#3b82f6','Blue'],['#6366f1','Indigo'],['#8b5cf6','Violet'],['#a78bfa','Lilac'],
+  ['#d946ef','Fuchsia'],['#f472b6','Pink'],['#fb7185','Ruby'],['#ff6b9a','Hot pink'],
+  ['#ff8a3d','Orange'],['#fbbf24','Amber'],['#22c55e','Green'],['#06b6d4','Cyan'],
+  ['#7f1d1d','Deep burgundy'],['#164e63','Deep ocean'],['#1e3a8a','Deep navy'],['#581c87','Deep violet'],
+  ['#14532d','Deep forest'],['#334155','Deep slate'],['#1f2937','Graphite'],['#3f1d1d','Cocoa']
+];
+function ensureReading(){
+  if(!Array.isArray(DB.reading))DB.reading=[];
+  DB.reading.forEach(r=>{
+    r.totalPages=Number(r.totalPages)||0;
+    r.pagesRead=Math.max(0,Number(r.pagesRead)||0);
+    if(r.totalPages)r.pagesRead=Math.min(r.pagesRead,r.totalPages);
+    r.pageGoal=Math.max(0,Number(r.pageGoal)||0);
+    r.color=r.color||((READ_TYPE.find(x=>x[0]===r.type)||READ_TYPE[0])[1]);
+    r.progress=r.totalPages?Math.round(r.pagesRead/r.totalPages*100):Math.max(0,Math.min(100,Number(r.progress)||0));
+    r.sessions=Array.isArray(r.sessions)?r.sessions:[];
+  });
+  return DB.reading;
+}
+function readingMetrics(r){
+  const total=Math.max(0,Number(r.totalPages)||0);
+  const read=Math.max(0,Number(r.pagesRead)||0);
+  const pct=total?Math.min(100,Math.round(read/total*100)):Math.max(0,Math.min(100,Number(r.progress)||0));
+  const left=total?Math.max(0,total-read):0;
+  const sessions=(r.sessions||[]).length;
+  const daysLogged=new Set((r.sessions||[]).map(x=>x.date).filter(Boolean)).size;
+  const sessionPages=(r.sessions||[]).reduce((a,x)=>a+Math.max(0,Number(x.pages)||0),0);
+  const avgPerActiveDay=daysLogged?Math.round(sessionPages/daysLogged):0;
+  const eta=avgPerActiveDay&&left?Math.ceil(left/avgPerActiveDay):0;
+  const minutes=(r.sessions||[]).reduce((a,x)=>a+Math.max(0,Number(x.minutes)||0),0);
+  return {total,read,pct,left,sessions,daysLogged,sessionPages,avgPerActiveDay,eta,minutes};
+}
 async function editRead(r={}){
   const isNew=!r.id;
   const out=await formModal(isNew?'Add to shelf':'Edit',[
     {k:'title',label:'Title',required:true},
-    {type:'row',fields:[{k:'author',label:'Author / source'},{k:'type',label:'Type',type:'select',options:READ_TYPE.map(x=>[x[0],x[0]])}]},
-    {type:'row',fields:[{k:'status',label:'Status',type:'select',options:READ_STATUS.map(x=>[x[0],x[1]])},{k:'progress',label:'Progress %',type:'number',min:0,max:100}]},
-    {k:'rating',label:'Rating (1–5)',type:'number',min:0,max:5},
+    {type:'row',fields:[
+      {k:'author',label:'Author / source'},
+      {k:'type',label:'Type',type:'select',options:READ_TYPE.map(x=>[x[0],x[0]])}
+    ]},
+    {type:'row',fields:[
+      {k:'status',label:'Status',type:'select',options:READ_STATUS.map(x=>[x[0],x[1]])},
+      {k:'color',label:'Reading colour',type:'color'}
+    ]},
+    {type:'row',fields:[
+      {k:'totalPages',label:'Total pages',type:'number',min:0,step:1,placeholder:'e.g. 320'},
+      {k:'pagesRead',label:'Pages read',type:'number',min:0,step:1,placeholder:'e.g. 74'}
+    ]},
+    {type:'row',fields:[
+      {k:'pageGoal',label:'Daily page goal',type:'number',min:0,step:1,placeholder:'e.g. 15'},
+      {k:'rating',label:'Rating (1–5)',type:'number',min:0,max:5}
+    ]},
     {k:'takeaway',label:'Key takeaway',type:'textarea',rows:3,placeholder:'The one idea worth keeping.'}
-  ],{type:'Book',status:'reading',progress:0,...r},{onDelete:isNew?null:async()=>{DB.reading=ensureReading().filter(x=>x.id!==r.id);commit();toast('Removed','trash')}});
+  ],{
+    type:'Book',status:'reading',totalPages:0,pagesRead:0,pageGoal:0,
+    color:READ_TYPE[0][1],rating:0,...r
+  },{
+    onDelete:isNew?null:async()=>{
+      DB.reading=ensureReading().filter(x=>x.id!==r.id);
+      commit();toast('Removed','trash');
+    }
+  });
   if(!out)return;
-  out.progress=Number(out.progress)||0; out.rating=Number(out.rating)||0;
-  if(out.status==='done'){out.progress=100; out.finished=r.finished||today();}
-  if(isNew)ensureReading().push({id:uid(),added:today(),...out}); else Object.assign(DB.reading.find(x=>x.id===r.id),out);
-  commit(); toast(isNew?'Added to shelf':'Saved','check');
+  out.totalPages=Math.max(0,Number(out.totalPages)||0);
+  out.pagesRead=Math.max(0,Number(out.pagesRead)||0);
+  if(out.totalPages)out.pagesRead=Math.min(out.pagesRead,out.totalPages);
+  out.pageGoal=Math.max(0,Number(out.pageGoal)||0);
+  out.rating=Math.max(0,Math.min(5,Number(out.rating)||0));
+  out.progress=out.totalPages?Math.round(out.pagesRead/out.totalPages*100):0;
+  if(out.status==='done'){
+    out.progress=100;
+    if(out.totalPages)out.pagesRead=out.totalPages;
+    out.finished=r.finished||today();
+  }
+  if(isNew)ensureReading().push({id:uid(),added:today(),sessions:[],...out});
+  else Object.assign(DB.reading.find(x=>x.id===r.id),out);
+  commit();toast(isNew?'Added to shelf':'Saved','check');
 }
-const AppReading={ id:'reading',name:'Reading',icon:'book',color:'#fbbf24',w:1020,h:720,
+async function logReadingSession(r){
+  const out=await formModal('Log reading session',[
+    {type:'row',fields:[
+      {k:'date',label:'Date',type:'date'},
+      {k:'pages',label:'Pages read today',type:'number',min:0,step:1}
+    ]},
+    {k:'minutes',label:'Minutes',type:'number',min:0,step:1},
+    {k:'note',label:'Session note',type:'textarea',rows:3,placeholder:'What moved forward?'}
+  ],{date:today(),pages:0,minutes:0,note:''});
+  if(!out)return;
+  const pages=Math.max(0,Number(out.pages)||0);
+  r.pagesRead=Math.max(0,Number(r.pagesRead)||0)+pages;
+  if(r.totalPages)r.pagesRead=Math.min(r.pagesRead,r.totalPages);
+  r.progress=r.totalPages?Math.round(r.pagesRead/r.totalPages*100):0;
+  r.sessions=r.sessions||[];
+  r.sessions.push({id:uid(),date:out.date||today(),pages,minutes:Math.max(0,Number(out.minutes)||0),note:out.note||''});
+  r.lastRead=out.date||today();
+  if(r.totalPages && r.pagesRead>=r.totalPages){
+    r.pagesRead=r.totalPages;r.progress=100;r.status='done';r.finished=r.finished||out.date||today();
+  }
+  commit();toast('Reading session saved','check');
+}
+
+const AppReading={ id:'reading',name:'Reading',icon:'book',color:'#fbbf24',w:1080,h:760,
   render(root,re,st){
     const list=ensureReading();
     const app=h('div',{class:'app'}),head=h('div',{class:'app-head'});
-    head.append(h('div',{},h('h2',{text:'Reading & Learning'}),h('div',{class:'sub',text:'What you read, and what you kept from it'})),h('div',{class:'spacer'}),
-      h('button',{class:'btn primary sm',html:`${icon('plus',14)} Add`,onclick:()=>editRead()}));
+    head.append(
+      h('div',{},h('h2',{text:'Reading & Learning'}),h('div',{class:'sub',text:'Track books by pages, pace, sessions and progress'})),
+      h('div',{class:'spacer'}),
+      h('button',{class:'btn primary sm',html:`${icon('plus',14)} Add`,onclick:()=>editRead()})
+    );
     app.append(head);
     const body=h('div',{class:'app-body'});
     const yr=String(fromYmd(today()).getFullYear());
     const finishedYr=list.filter(x=>x.status==='done'&&(x.finished||'').startsWith(yr)).length;
     const reading=list.filter(x=>x.status==='reading');
+    const totalPagesReading=reading.reduce((a,r)=>a+readingMetrics(r).total,0);
+    const pagesReadReading=reading.reduce((a,r)=>a+readingMetrics(r).read,0);
+    const overallPct=totalPagesReading?Math.round(pagesReadReading/totalPagesReading*100):0;
+
     const hero=h('div',{class:'v11-hero'},h('div',{style:{display:'flex',gap:'16px',alignItems:'center',position:'relative'}},
       h('div',{class:'v11-orb',html:icon('book',26,1.9)}),
-      h('div',{style:{flex:1,minWidth:0}},h('div',{class:'eyebrow',text:'KNOWLEDGE SHELF'}),
+      h('div',{style:{flex:1,minWidth:0}},
+        h('div',{class:'eyebrow',text:'KNOWLEDGE SHELF'}),
         h('h2',{text:`${finishedYr} finished in ${yr}`}),
-        h('p',{text:reading.length?`${reading.length} in progress right now. Depth compounds.`:'Nothing in progress. Start something that moves the mission.'}))));
+        h('p',{text:reading.length?`${reading.length} in progress · ${pagesReadReading.toLocaleString()} / ${totalPagesReading.toLocaleString()} pages · ${overallPct}% overall`:'Nothing in progress. Start something that moves the mission.'})
+      )
+    ));
     body.append(hero);
-    READ_STATUS.forEach(([sk,sl])=>{ const items=list.filter(x=>(x.status||'reading')===sk); if(!items.length)return;
-      body.append(h('div',{class:'eyebrow',style:{margin:'6px 0 8px'},text:sl.toUpperCase()}));
+
+    if(reading.length){
+      const summary=h('div',{class:'reading-summary-grid'});
+      summary.append(
+        h('div',{class:'reading-summary-card'},h('span',{class:'k'},'Books reading'),h('strong',{text:String(reading.length)})),
+        h('div',{class:'reading-summary-card'},h('span',{class:'k'},'Pages read'),h('strong',{text:pagesReadReading.toLocaleString()})),
+        h('div',{class:'reading-summary-card'},h('span',{class:'k'},'Pages remaining'),h('strong',{text:Math.max(0,totalPagesReading-pagesReadReading).toLocaleString()})),
+        h('div',{class:'reading-summary-card'},h('span',{class:'k'},'Overall progress'),h('strong',{text:`${overallPct}%`}))
+      );
+      body.append(summary);
+    }
+
+    READ_STATUS.forEach(([sk,sl])=>{
+      const items=list.filter(x=>(x.status||'reading')===sk);
+      if(!items.length)return;
+      body.append(h('div',{class:'eyebrow',style:{margin:'14px 0 8px'},text:sl.toUpperCase()}));
       const grid=h('div',{class:'v11-grid',style:{marginBottom:'14px'}});
-      items.sort((a,b)=>String(b.added).localeCompare(String(a.added))).forEach(r=>{ const c=(READ_TYPE.find(x=>x[0]===r.type)||READ_TYPE[0])[1];
-        const card=h('div',{class:'v11-card',style:{'--vc':c},onclick:()=>editRead(r)}); card.append(h('div',{class:'glow'}));
-        card.append(h('div',{class:'v11-row1'},h('div',{style:{flex:1,minWidth:0}},h('div',{class:'v11-name',text:r.title}),h('div',{class:'v11-sub',text:[r.author,r.type].filter(Boolean).join(' · ')})),h('span',{class:'v11-tag',text:r.type||''})));
-        if(sk==='reading'){ card.append(h('div',{class:'v11-bar'},h('i',{style:{width:(r.progress||0)+'%'}})),h('div',{class:'tiny',style:{marginTop:'4px'},text:`${r.progress||0}%`})); }
-        if(r.rating)card.append(h('div',{style:{marginTop:'6px',color:'#fbbf24',fontSize:'13px'},text:'★'.repeat(r.rating)+'☆'.repeat(5-r.rating)}));
-        if(r.takeaway)card.append(h('div',{class:'tiny',style:{marginTop:'6px',lineHeight:1.5},text:'“'+r.takeaway.slice(0,120)+(r.takeaway.length>120?'…':'')+'”'}));
-        grid.append(card); });
+      items.sort((a,b)=>String(b.added).localeCompare(String(a.added))).forEach(r=>{
+        const color=r.color||((READ_TYPE.find(x=>x[0]===r.type)||READ_TYPE[0])[1]);
+        const m=readingMetrics(r);
+        const c=h('div',{class:'v11-card reading-v13-card',style:{'--vc':color}});
+        c.append(h('div',{class:'glow'}));
+        c.append(
+          h('div',{class:'v11-row1'},
+            h('div',{style:{flex:1,minWidth:0}},
+              h('div',{class:'v11-name',text:r.title}),
+              h('div',{class:'v11-sub',text:[r.author,r.type].filter(Boolean).join(' · ')})
+            ),
+            h('span',{class:'v11-tag',style:{background:color+'22',borderColor:color+'55',color},text:r.type||''})
+          )
+        );
+
+        const stats=h('div',{class:'reading-mini-stats'});
+        stats.append(
+          h('span',{text:m.total?`${m.read}/${m.total} pages`:`${m.read} pages`}),
+          m.left?h('span',{text:`${m.left} left`}):null,
+          m.avgPerActiveDay?h('span',{text:`~${m.avgPerActiveDay}/active day`}):null,
+          m.eta?h('span',{text:`≈${m.eta} days`}):null
+        );
+        c.append(stats);
+
+        c.append(
+          h('div',{class:'v11-bar reading-progress',style:{'--bar-color':color}},h('i',{style:{width:m.pct+'%'}})),
+          h('div',{class:'reading-progress-row'},
+            h('strong',{text:`${m.pct}%`}),
+            h('span',{text:m.total?`${m.read.toLocaleString()} of ${m.total.toLocaleString()} pages`:'Set total pages to calculate progress'})
+          )
+        );
+
+        if(r.pageGoal){
+          const goalPct=m.avgPerActiveDay?Math.min(100,Math.round((m.avgPerActiveDay/r.pageGoal)*100)):0;
+          c.append(h('div',{class:'reading-goal-line'},
+            h('span',{text:`Daily goal · ${r.pageGoal} pages`}),
+            h('strong',{text:m.avgPerActiveDay?`${goalPct}% pace`:'Not started'})
+          ));
+        }
+
+        c.append(h('div',{class:'tiny',style:{marginTop:'6px'},text:`${m.sessions} sessions · ${m.minutes}m logged · ${m.daysLogged} active day(s)`}));
+
+        // Quick visual color spectrum: choose a distinct color without reopening the editor.
+        const palette=h('div',{class:'reading-color-palette',onclick:e=>e.stopPropagation()});
+        READ_COLORS.forEach(([hex,name])=>{
+          const sw=h('button',{
+            class:'reading-color-swatch'+(hex.toLowerCase()===color.toLowerCase()?' selected':''),
+            title:name,
+            'aria-label':name,
+            style:{background:hex},
+            onclick:e=>{
+              e.stopPropagation();
+              r.color=hex;
+              commit();re();
+            }
+          });
+          palette.append(sw);
+        });
+        c.append(h('div',{class:'reading-color-label',text:'Reading colour'}),palette);
+
+        if(r.rating)c.append(h('div',{style:{marginTop:'6px',color:'#fbbf24',fontSize:'13px'},text:'★'.repeat(r.rating)+'☆'.repeat(5-r.rating)}));
+        if(r.takeaway)c.append(h('div',{class:'tiny',style:{marginTop:'6px',lineHeight:1.5},text:'“'+r.takeaway.slice(0,120)+(r.takeaway.length>120?'…':'')+'”'}));
+
+        const actions=h('div',{class:'reading-actions'});
+        if(sk==='reading') actions.append(
+          h('button',{class:'btn primary sm',text:'Log pages',onclick:(e)=>{e.stopPropagation();logReadingSession(r).then(()=>re())}}),
+          h('button',{class:'btn ghost sm',text:'Edit',onclick:(e)=>{e.stopPropagation();editRead(r).then(()=>re())}})
+        );
+        c.append(actions);
+        c.onclick=()=>editRead(r);
+        grid.append(c);
+      });
       body.append(grid);
     });
+
     if(!list.length)body.append(h('div',{class:'empty',html:'<div>Your shelf is empty.<br>Add a book, article or course.</div>'}));
-    app.append(body); root.append(app);
+    app.append(body);root.append(app);
   }
 };
 
@@ -7749,7 +7963,7 @@ if(typeof buildDock==='function')buildDock();
 if(typeof buildDesktopIcons==='function')buildDesktopIcons();
 if(typeof syncDock==='function')syncDock();
 
-console.log('%cOrbit v11','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
+console.log('%cOrbit v14','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
 })();
 </script>
 
