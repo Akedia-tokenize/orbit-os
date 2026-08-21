@@ -6863,6 +6863,30 @@ function growthReviewCard(){
 function goalSticker(g){return g.sticker||({'Health':'💪','Learning':'📚','Work':'🚀','Finance':'💰','Personal':'✨','Relationships':'💞','Travel':'✈️','Creative':'🎨'}[g.category]||'🎯');}
 function goalSeason(g){const base=goalDeadline(g)||g.startDate||today(); const a=String(base).split('-').map(Number); const j=gregorianToJalali(a[0],a[1],a[2]); const m=j[1]; if(m<=3)return {key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'}; if(m<=6)return {key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'}; if(m<=9)return {key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'}; return {key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'};}
 function goalCardV5(g){const pct=goalPct(g),d=goalDeadline(g),days=d?daysBetween(today(),d):null;const overdue=days!=null&&days<0&&!g.done;const c=h('div',{class:'goal-v5',style:{'--goal-color':g.color||'var(--accent)'}});c.onclick=e=>{if(e.target.closest('button'))return;editGoalV5(g)};c.innerHTML=`<div class="goal-glow"></div><div class="goal-sticker" title="Goal sticker">${goalSticker(g)}</div><div class="goal-head"><span class="goal-dot"></span><span class="goal-cat">${esc(g.category||'General')}</span><span class="goal-pri ${String(g.priority||'Medium').toLowerCase()}">${esc(g.priority||'Medium')}</span></div><h3>${esc(g.title)}</h3><div class="goal-kpi"><span>${esc(g.pillarId?(vision().pillars.find(p=>p.id===g.pillarId)?.name||'Pillar'):(g.kpi||g.measurement||'Outcome'))}</span><strong>${g.target!=null&&g.target!==''?`${g.current||0} / ${g.target} ${esc(g.unit||'')}`:(g.done?'Complete':'In progress')}</strong></div><div class="goal-bar"><i style="width:${pct}%"></i></div><div class="goal-foot"><span>${d?`${esc(fmtDate(d,{month:'short',day:'numeric',year:'numeric'}))}`:'No deadline'} </span><b class="${overdue?'overdue':''}">${overdue?'OVERDUE':days===0?'TODAY':days!=null?`${days}d left`:''}</b></div>${reviewBadges(g)?`<div class="review-row">${reviewBadges(g)}</div>`:''}`;return c;}
+
+function openQuarterGoalEditor(monthNum,re){
+  const month=Number(monthNum)||1;
+  const seed={
+    scope:'quarter',
+    quarterMonth:month,
+    quarterInQuarter:true,
+    startDate:ORBIT_DEFAULT_DATE,
+    endDate:ORBIT_DEFAULT_DATE
+  };
+  return editGoalV8(seed,'quarter').then(()=>{ if(typeof re==='function')re(); });
+}
+function openMonthlyGoalEditor(monthNum,re){
+  const month=Number(monthNum)||1;
+  const seed={
+    scope:'month',
+    quarterMonth:month,
+    quarterInQuarter:true,
+    startDate:ORBIT_DEFAULT_DATE,
+    endDate:ORBIT_DEFAULT_DATE
+  };
+  return editGoalV8(seed,'month').then(()=>{ if(typeof re==='function')re(); });
+}
+
 AppGoals.render=function(root,re,st){ensureGoalModel();const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});head.append(h('div',{},h('h2',{text:'Goals'}),h('div',{class:'sub',text:'Direction → measurement → evidence → review'})),h('div',{class:'spacer'}),h('button',{class:'btn sm',html:`${icon('bolt',13)} Challenge`,onclick:editChallenge}),h('button',{class:'btn primary sm',html:`${icon('plus',14)} Goal`,onclick:()=>editGoalV5({},'week')}));app.append(head);const body=h('div',{class:'app-body'});body.append(challengeCard(re));
   const controls=h('div',{class:'goal-controls'}), scope=h('div',{class:'seg'}), scopes=[['all','All'],['day','Daily'],['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly'],['long','Long-term']];scopes.forEach(([k,l])=>scope.append(h('button',{class:(st.scope||'all')===k?'on':'',text:l,onclick:()=>{st.scope=k;re();}})));controls.append(scope);const cat=h('select',{class:'inp goal-filter'});cat.append(h('option',{value:'all',text:'All categories'}));goalCategories().forEach(x=>cat.append(h('option',{value:x,text:x})));cat.value=st.cat||'all';cat.onchange=()=>{st.cat=cat.value;re()};controls.append(cat);body.append(controls);
   const list=DB.goals.filter(g=>(st.scope||'all')==='all'||g.scope===(st.scope||'all')).filter(g=>(st.cat||'all')==='all'||g.category===st.cat).sort(goalSort);const seasons=[{key:'spring',name:'Spring',months:'Farvardin · Ordibehesht · Khordad',icon:'🌱',color:'#4ade80'},{key:'summer',name:'Summer',months:'Tir · Mordad · Shahrivar',icon:'☀️',color:'#f59e0b'},{key:'autumn',name:'Autumn',months:'Mehr · Aban · Azar',icon:'🍂',color:'#f97316'},{key:'winter',name:'Winter',months:'Dey · Bahman · Esfand',icon:'❄️',color:'#38bdf8'}];const seasonGroups={};seasons.forEach(x=>seasonGroups[x.key]=[]);list.forEach(g=>seasonGroups[goalSeason(g).key].push(g));seasons.forEach(se=>{const gs=seasonGroups[se.key];if(!gs.length)return;const sec=h('section',{class:'goal-season',style:{'--season-color':se.color}});const sh=h('div',{class:'goal-season-head'});sh.append(h('div',{class:'goal-season-icon',text:se.icon}),h('div',{},h('div',{class:'goal-season-title',text:se.name}),h('div',{class:'goal-season-sub',text:`Jalali season · ${se.months}`})),h('span',{class:'goal-season-count',text:`${gs.length} goal${gs.length===1?'':'s'}`}));sec.append(sh);const byCat={};gs.forEach(g=>(byCat[g.category||'General']||=[]).push(g));Object.entries(byCat).forEach(([catName,cgs])=>{sec.append(h('div',{class:'goal-section-head'},h('h3',{text:catName}),h('span',{class:'tiny',text:`${cgs.length}`})));const grid=h('div',{class:'goal-grid'});cgs.forEach(g=>grid.append(goalCardV5(g)));sec.append(grid);});body.append(sec);});if(!list.length)body.append(h('div',{class:'empty',html:`<div class="big">${icon('compass',32)}</div><div>No goals in this horizon yet.<br>Set one that can be measured.</div>`}));app.append(body);root.append(app);
@@ -7091,7 +7115,7 @@ AppGoals.render=function(root,re,st){
     DB.goals=Array.isArray(DB.goals)?DB.goals:[]; DB.projects=Array.isArray(DB.projects)?DB.projects:[];
     DB.goals.forEach(g=>{
       if(g.scope==='day') g.scope='week';
-      g.scope=g.scope||'week'; g.category=g.category||'General'; g.startDate=g.startDate||today();
+      g.scope=g.scope||'week'; g.category=g.category||'General'; g.startDate=g.startDate||today(); g.quarterMonth=Number(g.quarterMonth)||1;
       g.milestones=Array.isArray(g.milestones)?g.milestones:[]; g.reviewDates=Array.isArray(g.reviewDates)?g.reviewDates:[]; g.pinned=!!g.pinned; g.checklistOpen=!!g.checklistOpen;
       g.milestones=g.milestones.map(m=>({id:m.id||uid(),title:String(m.title||'Milestone'),done:!!m.done,completedAt:m.completedAt||''})).filter(m=>m.title.trim());
     });
@@ -7207,15 +7231,39 @@ AppGoals.render=function(root,re,st){
     out.reviewDates=String(out.reviewText||'').split(',').map(x=>x.trim()).filter(Boolean);delete out.milestoneText;delete out.reviewText;
     if(out.scope==='day')out.scope='week';
     if(out.scope==='month'){
-      out.quarterMonth=Number(out.quarterMonth)||1;
+      out.quarterMonth=Number(out.quarterMonth)||Number(g.quarterMonth)||1;
       out.quarterInQuarter=String(out.quarterInQuarter||'yes')!=='no';
+    }else if(out.scope==='quarter'){
+      out.quarterMonth=Number(out.quarterMonth)||Number(g.quarterMonth)||1;
+      out.quarterInQuarter=true;
     }else{
       out.quarterInQuarter=false;
     }
     if(isNew)DB.goals.push({id:uid(),createdAt:today(),done:false,...out});else Object.assign(DB.goals.find(x=>x.id===g.id),out);
     commit(); re();
   }
-  function render(root,re,st){
+  
+async function openQuarterGoalEditor(monthNum,re){
+  const mnum=Number(monthNum)||1;
+  const seed={
+    scope:'quarter',
+    quarterMonth:String(mnum),
+    quarterInQuarter:true,
+    startDate:ORBIT_DEFAULT_DATE,
+    endDate:ORBIT_DEFAULT_DATE,
+    category:cats()[0]||'General',
+    priority:'Medium',
+    measurement:'milestone',
+    current:0,
+    target:'',
+    milestoneText:'',
+    reviewText:'',
+    why:''
+  };
+  await openEditor(seed,re);
+}
+
+function render(root,re,st){
     ensure(); st=st||{}; if(!st.scope)st.scope='quarter';
     const app=h('div',{class:'app goal-app'}),head=h('div',{class:'app-head'});
     const headerSentence=DB.settings?.goalHeaderSentence||'';
@@ -7271,7 +7319,7 @@ AppGoals.render=function(root,re,st){
         se.months.forEach(mnum=>{
           const m=QUARTER_MONTHS.find(x=>x.n===mnum); const monthWrap=h('div',{class:'quarter-month'}),mh=h('div',{class:'quarter-month-head'});
           mh.append(h('strong',{text:m.name}));
-          mh.append(h('button',{class:'btn primary sm quarter-add',text:'+ Goal',onclick:()=>openEditor({scope:'quarter',quarterMonth:String(mnum),startDate:ORBIT_DEFAULT_DATE,endDate:ORBIT_DEFAULT_DATE},re)}));
+          mh.append(h('button',{class:'btn primary sm quarter-add',text:'+ Goal',onclick:()=>openQuarterGoalEditor(mnum,re)}));
           monthWrap.append(mh);
           const gs=list.filter(g=>(
             g.scope==='quarter' || (g.scope==='month' && g.quarterInQuarter!==false)
@@ -8083,7 +8131,7 @@ if(typeof buildDock==='function')buildDock();
 if(typeof buildDesktopIcons==='function')buildDesktopIcons();
 if(typeof syncDock==='function')syncDock();
 
-console.log('%cOrbit v16','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
+console.log('%cOrbit v18','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
 })();
 </script>
 
