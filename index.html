@@ -1181,6 +1181,75 @@ input.persian-text,
   .reading-actions .btn{flex:1}
 }
 </style>
+
+<style id="orbit-reading-v15-fix">
+.reading-v13-card{
+  background:
+    radial-gradient(420px 220px at 100% 0%, color-mix(in srgb,var(--vc) 20%,transparent), transparent 68%),
+    linear-gradient(145deg,
+      color-mix(in srgb,var(--vc) 17%,var(--surface)),
+      var(--surface) 46%,
+      color-mix(in srgb,var(--plum) 8%,var(--surface-2)));
+  border-color:color-mix(in srgb,var(--vc) 42%,var(--border));
+  box-shadow:0 12px 28px color-mix(in srgb,var(--vc) 10%,transparent), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.reading-v13-card::after{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(125deg,transparent 28%,color-mix(in srgb,var(--vc) 8%,transparent),transparent 72%);
+  opacity:.7;
+}
+.reading-v13-card > *{position:relative;z-index:1}
+.reading-v13-card .glow{z-index:0!important}
+.reading-progress{
+  height:12px!important;
+  margin-top:9px!important;
+  background:linear-gradient(90deg,var(--surface-3),color-mix(in srgb,var(--vc) 10%,var(--surface-3)))!important;
+  border:1px solid color-mix(in srgb,var(--vc) 20%,var(--border));
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.12);
+}
+.reading-progress i{
+  display:block!important;
+  min-width:2px;
+  height:100%!important;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--vc),color-mix(in srgb,var(--vc) 48%,#ffffff),color-mix(in srgb,var(--plum) 45%,var(--vc)))!important;
+  box-shadow:0 0 10px color-mix(in srgb,var(--vc) 35%,transparent);
+  transition:width .28s ease;
+}
+.reading-progress-row strong{
+  color:var(--vc);
+  font-size:14px;
+}
+.reading-progress-row span{font-size:10.5px}
+.reading-color-control{
+  position:absolute!important;
+  right:12px;top:12px;z-index:5!important;
+}
+.reading-color-button{
+  width:24px;height:24px;border-radius:50%;padding:0;
+  border:2px solid rgba(255,255,255,.8);
+  box-shadow:0 4px 10px rgba(0,0,0,.18),0 0 0 3px color-mix(in srgb,var(--vc) 16%,transparent);
+}
+.reading-color-popover{
+  position:absolute;right:0;top:32px;width:188px;padding:9px;
+  display:grid;grid-template-columns:repeat(7,18px);gap:6px;
+  background:var(--glass-strong);backdrop-filter:blur(16px);
+  border:1px solid var(--border-strong);border-radius:12px;
+  box-shadow:0 16px 34px rgba(0,0,0,.28);
+}
+.reading-color-swatch{
+  width:18px;height:18px;padding:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,.26);
+  box-shadow:0 1px 4px rgba(0,0,0,.16);
+}
+.reading-color-swatch:hover{transform:scale(1.18)}
+.reading-color-swatch.selected{outline:2px solid var(--text);outline-offset:2px}
+.reading-color-label,.reading-color-palette{display:none!important}
+@media(max-width:700px){
+  .reading-color-popover{grid-template-columns:repeat(7,18px);width:184px}
+}
+</style>
 </head>
 <body data-wall="aurora">
 <style>
@@ -7892,12 +7961,10 @@ const AppReading={ id:'reading',name:'Reading',icon:'book',color:'#fbbf24',w:108
         );
 
         const stats=h('div',{class:'reading-mini-stats'});
-        stats.append(
-          h('span',{text:m.total?`${m.read}/${m.total} pages`:`${m.read} pages`}),
-          m.left?h('span',{text:`${m.left} left`}):null,
-          m.avgPerActiveDay?h('span',{text:`~${m.avgPerActiveDay}/active day`}):null,
-          m.eta?h('span',{text:`≈${m.eta} days`}):null
-        );
+        stats.append(h('span',{text:m.total?`${m.read}/${m.total} pages`:`${m.read} pages`}));
+        if(m.left)stats.append(h('span',{text:`${m.left} left`}));
+        if(m.avgPerActiveDay)stats.append(h('span',{text:`~${m.avgPerActiveDay}/active day`}));
+        if(m.eta)stats.append(h('span',{text:`≈${m.eta} days`}));
         c.append(stats);
 
         c.append(
@@ -7918,23 +7985,32 @@ const AppReading={ id:'reading',name:'Reading',icon:'book',color:'#fbbf24',w:108
 
         c.append(h('div',{class:'tiny',style:{marginTop:'6px'},text:`${m.sessions} sessions · ${m.minutes}m logged · ${m.daysLogged} active day(s)`}));
 
-        // Quick visual color spectrum: choose a distinct color without reopening the editor.
-        const palette=h('div',{class:'reading-color-palette',onclick:e=>e.stopPropagation()});
+        // Compact floating color picker — the color now belongs to the whole card.
+        const colorControl=h('div',{class:'reading-color-control'});
+        const colorButton=h('button',{
+          class:'reading-color-button',
+          title:'Choose reading colour',
+          'aria-label':'Choose reading colour',
+          style:{background:`linear-gradient(135deg,${color},color-mix(in srgb,${color} 52%,#fff))`}
+        });
+        const pop=h('div',{class:'reading-color-popover',style:{display:'none'},onclick:e=>e.stopPropagation()});
         READ_COLORS.forEach(([hex,name])=>{
-          const sw=h('button',{
+          pop.append(h('button',{
             class:'reading-color-swatch'+(hex.toLowerCase()===color.toLowerCase()?' selected':''),
-            title:name,
-            'aria-label':name,
-            style:{background:hex},
+            title:name,'aria-label':name,style:{background:hex},
             onclick:e=>{
               e.stopPropagation();
               r.color=hex;
               commit();re();
             }
-          });
-          palette.append(sw);
+          }));
         });
-        c.append(h('div',{class:'reading-color-label',text:'Reading colour'}),palette);
+        colorButton.onclick=e=>{
+          e.stopPropagation();
+          pop.style.display=pop.style.display==='none'?'grid':'none';
+        };
+        colorControl.append(colorButton,pop);
+        c.append(colorControl);
 
         if(r.rating)c.append(h('div',{style:{marginTop:'6px',color:'#fbbf24',fontSize:'13px'},text:'★'.repeat(r.rating)+'☆'.repeat(5-r.rating)}));
         if(r.takeaway)c.append(h('div',{class:'tiny',style:{marginTop:'6px',lineHeight:1.5},text:'“'+r.takeaway.slice(0,120)+(r.takeaway.length>120?'…':'')+'”'}));
@@ -7963,7 +8039,7 @@ if(typeof buildDock==='function')buildDock();
 if(typeof buildDesktopIcons==='function')buildDesktopIcons();
 if(typeof syncDock==='function')syncDock();
 
-console.log('%cOrbit v14','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
+console.log('%cOrbit v15','color:#e8567f;font-weight:700','— People · English · Reading · investment units · polish');
 })();
 </script>
 
